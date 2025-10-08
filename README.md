@@ -149,7 +149,7 @@ with ContextTracing().trace("my_ai_operation"):
 ```
 
 
-https://github.com/user-attachments/assets/08cbe507-a5cb-49d4-8a82-ae4012d1e076
+![Demo](https://github.com/user-attachments/assets/02742e87-aa48-4308-94c8-6f362e3218b4)
 
 
 ## 🎯 Examples
