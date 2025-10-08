@@ -130,13 +130,11 @@ from datapizza.tracing import ContextTracing
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
 
-client = OpenAIClient(api_key="YOUR_API_KEY")
-agent = Agent(name="assistant", client=client)
+client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))
+agent = Agent(name="assistant", client=client, tools = [DuckDuckGoSearchTool()])
 
-# Trace your operations with rich console output
 with ContextTracing().trace("my_ai_operation"):
-    response = agent.run("Explain machine learning in simple terms")
-    print(response.text)
+    response = agent.run("Tell me some news about Bitcoin")
 
 # Output shows:
 # ╭─ Trace Summary of my_ai_operation ──────────────────────────────────╮
@@ -151,6 +149,7 @@ with ContextTracing().trace("my_ai_operation"):
 ```
 
 
+https://github.com/user-attachments/assets/08cbe507-a5cb-49d4-8a82-ae4012d1e076
 
 
 ## 🎯 Examples
