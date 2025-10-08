@@ -116,6 +116,41 @@ print(response.text)
 ```
 
 
+## 📊 Detailed Tracing 
+
+
+A key requirement for principled development of LLM applications over your data (RAG systems, agents) is being able to observe and debug.
+
+Datapizza-ai provides built-in observability with OpenTelemetry tracing to help you monitor performance and understand execution flow.
+
+<summary><b>🔍 Trace Your AI Operations</b></summary>
+
+```python
+from datapizza.tracing import ContextTracing
+from datapizza.agents import Agent
+from datapizza.clients.openai import OpenAIClient
+
+client = OpenAIClient(api_key="YOUR_API_KEY")
+agent = Agent(name="assistant", client=client)
+
+# Trace your operations with rich console output
+with ContextTracing().trace("my_ai_operation"):
+    response = agent.run("Explain machine learning in simple terms")
+    print(response.text)
+
+# Output shows:
+# ╭─ Trace Summary of my_ai_operation ──────────────────────────────────╮
+# │ Total Spans: 3                                                      │
+# │ Duration: 2.45s                                                     │
+# │ ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓ |
+# │ ┃ Model       ┃ Prompt Tokens ┃ Completion Tokens ┃ Cached Tokens ┃ |
+# │ ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩ |
+# │ │ gpt-4o-mini │ 31            │ 27                │ 0             │ |
+# │ └─────────────┴───────────────┴───────────────────┴───────────────┘ |
+# ╰─────────────────────────────────────────────────────────────────────╯
+```
+
+
 
 
 ## 🎯 Examples
@@ -250,6 +285,8 @@ print(f"Generated response: {result['generator']}")
 ```
 
 </details>
+
+
 
 ## 🌐 Ecosystem
 
