@@ -1,12 +1,10 @@
 <div align="center">
 
-# 🍕 DataPizza AI
-
 <img src="docs/assets/logo.png" alt="DataPizza AI Logo" width="200" height="200">
 
-**The Ultimate Framework for Production-Ready AI Applications**
+**Build reliable Gen AI solutions without overhead**
 
-*Build reliable GenAI solutions without the overhead*
+*Written in Python. Designed for speed. A no-fluff GenAI framework that gets your agents from dev to prod, fast*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/datapizza-ai.svg)](https://pypi.org/project/datapizza-ai/)
@@ -22,21 +20,26 @@
 
 ## 🌟 Why DataPizza AI?
 
-DataPizza AI transforms the way you build AI applications. No more wrestling with complex integrations, debugging mysterious failures, or spending weeks on boilerplate code.
+A framework that keeps your agents predictable, your debugging fast, and your code trusted in production. Built by Engineers, trusted by Engineers.
 
 <div align="center">
 
-### ⚡ **40% Less Debugging** | 🚀 **10x Faster Development** | 🔧 **Production-Ready**
+### ⚡ **Less abstraction, more control** | 🚀 **API-first design** | 🔧 **Observable by default**
 
 </div>
 
+## How to install
+```sh
+pip install datapizza-ai
+```
+
+## Client invoke
+
 ```python
-# This is all you need for a production RAG system
-from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
 
-agent = Agent(name="my_agent", client=OpenAIClient(api_key="YOUR_API_KEY"))
-result = agent.run("What's the latest in AI research?")
+client=OpenAIClient(api_key="YOUR_API_KEY")
+result = client.invoke("Hi, how are u?")
 print(result.text)
 ```
 
@@ -46,40 +49,38 @@ print(result.text)
 <tr>
 <td width="50%">
 
-### 🎯 **Smart Agents**
+### 🎯 **API-first**
 - **Multi-Provider Support**: OpenAI, Google Gemini, Anthropic, Mistral, Azure
 - **Tool Integration**: Built-in web search, document processing, custom tools
 - **Memory Management**: Persistent conversations and context awareness
-- **Streaming Support**: Real-time responses for better UX
 
 </td>
 <td width="50%">
 
-### 🔍 **Advanced RAG**
+### 🔍 **Composable**
+- **Reusable blocks**: Declarative configuration, easy overrides
 - **Document Processing**: PDF, DOCX, images with Azure AI & Docling
 - **Smart Chunking**: Context-aware text splitting and embedding
-- **Vector Stores**: Qdrant integration with more coming soon
-- **Reranking**: Cohere and Together AI for precision retrieval
+- **Built-in reranking**: Add a reranker (e.g., Cohere) to boost relevance
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 🔧 **Production Ready**
-- **End-to-End Tracing**: Track every LLM call with inputs/outputs
-- **Caching Layer**: Redis integration for performance optimization
-- **Pipeline Architecture**: DAG-based workflows for complex use cases
-- **Type Safety**: Full TypeScript-style typing for Python
+### 🔧 **Observable**
+- **OpenTelemetry tracing**: Standards-based instrumentation
+- **Client I/O tracing**: Optional toggle to log inputs, outputs, and in-memory context
+- **Custom spans**: Trace fine-grained phases and sub-steps to pinpoint bottlenecks
 
 </td>
 <td width="50%">
 
-### 🚀 **Developer Experience**
-- **Minimal Boilerplate**: Focus on logic, not plumbing
+### 🚀 **Vendor-Agnostic**
+- **Swap models**: Change providers without rewiring business logic
 - **Clear Interfaces**: Predictable APIs across all components
 - **Rich Ecosystem**: Modular design with optional components
-- **Comprehensive Docs**: Examples, guides, and API references
+- **Migration-friendly**: Quick migration from other frameworks
 
 </td>
 </tr>
@@ -99,7 +100,7 @@ pip install datapizza-ai-clients-google
 pip install datapizza-ai-clients-anthropic
 ```
 
-### 30-Second Agent
+### Start with Agent
 
 ```python
 from datapizza.agents import Agent
@@ -114,7 +115,66 @@ response = agent.run("Explain quantum computing in simple terms")
 print(response.text)
 ```
 
-### 2-Minute RAG System
+
+
+
+## 🎯 Examples
+
+
+<details>
+<summary><b>🌐 Multy agent system</b></summary>
+
+```sh
+# Install DuckDuckGo tool
+pip install datapizza-ai-tools-duckduckgo
+```
+
+
+```python
+from datapizza.agents.agent import Agent
+from datapizza.clients.openai import OpenAIClient
+from datapizza.tools import tool
+from datapizza.tools.duckduckgo import DuckDuckGoSearchTool
+
+client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1")
+
+@tool
+def get_weather(city: str) -> str:
+    return f""" it's sunny all the week in {city}"""
+
+weather_agent = Agent(
+    name="weather_expert",
+    client=client,
+    system_prompt="You are a weather expert. Provide detailed weather information and forecasts.",
+    tools=[get_weather]
+)
+
+web_search_agent = Agent(
+    name="web_search_expert",
+    client=client,
+    system_prompt="You are a web search expert. You can search the web for information.",
+    tools=[DuckDuckGoSearchTool()]
+)
+
+planner_agent = Agent(
+    name="planner",
+    client=client, 
+    system_prompt="You are a trip planner. You should provide a plan for the user. Make sure to provide a detailed plan with the best places to visit and the best time to visit them."
+)
+
+planner_agent.can_call([weather_agent, web_search_agent])
+
+response = planner_agent.run(
+    "I need to plan a hiking trip in Seattle next week. I want to see some waterfalls and a forest."
+)
+print(response.text)
+
+```
+
+</details>
+
+<details>
+<summary><b>📊 Document Ingestion</b></summary>
 
 ```python
 from datapizza.core.vectorstore import VectorConfig
@@ -125,7 +185,6 @@ from datapizza.modules.splitters import NodeSplitter
 from datapizza.pipeline import IngestionPipeline
 from datapizza.vectorstores.qdrant import QdrantVectorstore
 
-# Set up your RAG pipeline
 vectorstore = QdrantVectorstore(location=":memory:")
 embedder = ChunkEmbedder(client=OpenAIEmbedder(api_key="YOUR_API_KEY", model_name="text-embedding-3-small"))
 vectorstore.create_collection("my_documents",vector_config=[VectorConfig(name="embedding", dimensions=1536)])
@@ -146,101 +205,51 @@ results = vectorstore.search(query_vector = [0.0] * 1536, collection_name="my_do
 print(results)
 ```
 
-## 🎯 Examples
-
-<details>
-<summary><b>🔍 Advanced RAG with Reranking</b></summary>
-
-```python
-from datapizza.agents import Agent
-from datapizza.clients import OpenAIClient
-from datapizza.modules.rerankers.cohere import CohereReranker
-from datapizza.pipeline import DagPipeline
-
-# Create a sophisticated RAG agent
-client = OpenAIClient(api_key="your-key")
-reranker = CohereReranker(api_key="cohere-key")
-
-rag_pipeline = DagPipeline()
-rag_pipeline.add_node("retrieve", retriever)
-rag_pipeline.add_node("rerank", reranker)
-rag_pipeline.add_node("generate", client)
-
-agent = Agent(
-    name="rag_expert",
-    client=client,
-    pipeline=rag_pipeline
-)
-
-result = agent.run("Compare renewable energy policies across countries")
-```
-
 </details>
 
+
+
+
 <details>
-<summary><b>🌐 Web-Enhanced Agent</b></summary>
-
-`pip install datapizza-ai-tools-duckduckgo`
-
+<summary><b>📊 RAG</b></summary>
 
 ```python
-from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
-from datapizza.tools.duckduckgo import DuckDuckGoSearchTool
+from datapizza.embedders.openai import OpenAIEmbedder
+from datapizza.modules.prompt import ChatPromptTemplate
+from datapizza.modules.rewriters import ToolRewriter
+from datapizza.pipeline import DagPipeline
+from datapizza.vectorstores.qdrant import QdrantVectorstore
 
-client = OpenAIClient(api_key="YOUR_API_KEY")
-
-agent = Agent(
-    name="web_researcher",
-    client=client,
-    tools=[DuckDuckGoSearchTool()]
+openai_client = OpenAIClient(
+    model="gpt-4o-mini",
+    api_key="YOUR_API_KEY"
 )
 
-result = agent.run("Who are the founders of Datapizza?")
-print(result.text)
+dag_pipeline = DagPipeline()
+dag_pipeline.add_module("rewriter",  ToolRewriter( client=openai_client, system_prompt="Rewrite user queries to improve retrieval accuracy." ))
+dag_pipeline.add_module("embedder", OpenAIEmbedder( api_key= "YOUR_API_KEY", model_name="text-embedding-3-small" ))
+dag_pipeline.add_module("retriever", QdrantVectorstore(host="localhost", port=6333).as_retriever(collection_name="my_documents", k=5))
+dag_pipeline.add_module("prompt", ChatPromptTemplate( user_prompt_template="User question: {{user_prompt}}\n:", retrieval_prompt_template="Retrieved content:\n{% for chunk in chunks %}{{ chunk.text }}\n{% endfor %}"))
+dag_pipeline.add_module("generator", openai_client)
+
+dag_pipeline.connect("rewriter", "embedder", target_key="text")
+dag_pipeline.connect("embedder", "retriever", target_key="query_vector")
+dag_pipeline.connect("retriever", "prompt", target_key="chunks")
+dag_pipeline.connect("prompt", "generator", target_key="memory")
+
+query = "tell me something about this document"
+result = dag_pipeline.run({
+    "rewriter": {"user_prompt": query},
+    "prompt": {"user_prompt": query},
+    "retriever": {"collection_name": "my_documents", "k": 3},
+    "generator":{"input": query}
+})
+
+print(f"Generated response: {result['generator']}")
 ```
 
 </details>
-
-<details>
-<summary><b>📊 Multi-Modal Document Processing</b></summary>
-
-```python
-from datapizza.modules.parsers.azure import AzureParser
-from datapizza.modules.captioners import LLMCaptioner
-from datapizza.pipeline import IngestionPipeline
-
-# Process documents with images and tables
-parser = AzureParser(
-    api_key="azure-key",
-    endpoint="your-endpoint"
-)
-captioner = LLMCaptioner(client=OpenAIClient(api_key="openai-key"))
-
-pipeline = IngestionPipeline(
-    components=[parser, captioner, embedder],
-    vectorstore=vectorstore
-)
-
-# Handles PDFs with complex layouts, images, and tables
-pipeline.process("complex_research_paper.pdf")
-```
-
-</details>
-
-## 🏗️ Architecture
-
-<div align="center">
-<img src="docs/assets/workflow.png" alt="DataPizza AI Architecture" width="800">
-</div>
-
-DataPizza AI follows a modular, pipeline-based architecture:
-
-- **🧠 Agents**: Orchestrate complex workflows with memory and tools
-- **🔌 Clients**: Unified interface for all AI providers
-- **⚙️ Modules**: Composable components for document processing
-- **🔄 Pipelines**: DAG-based execution for complex workflows
-- **📊 Observability**: Built-in tracing and monitoring
 
 ## 🌐 Ecosystem
 
@@ -260,31 +269,17 @@ DataPizza AI follows a modular, pipeline-based architecture:
 
 | Category | Components |
 |----------|------------|
-| **📄 Document Parsers** | Azure AI Document Intelligence, Docling, Unstructured |
-| **🔍 Vector Stores** | Qdrant (more coming soon) |
+| **📄 Document Parsers** | Azure AI Document Intelligence, Docling |
+| **🔍 Vector Stores** | Qdrant |
 | **🎯 Rerankers** | Cohere, Together AI |
 | **🌐 Tools** | DuckDuckGo Search, Custom Tools |
-| **💾 Caching** | Redis |
+| **💾 Caching** | Redis integration for performance optimization |
 | **📊 Embedders** | OpenAI, Google, Cohere, FastEmbed |
-
-## 📈 Performance
-
-<div align="center">
-
-| Metric | DataPizza AI | Traditional Approach |
-|--------|--------------|---------------------|
-| **Development Time** | 2-3 days | 2-3 weeks |
-| **Lines of Code** | 50-100 | 500-1000 |
-| **Debugging Time** | 40% less | Baseline |
-| **Production Issues** | Minimal | Frequent |
-
-</div>
 
 ## 🎓 Learning Resources
 
 - 📖 **[Complete Documentation](https://docs.datapizza.tech)** - Comprehensive guides and API reference
 - 🚀 **[Quick Start Guide](https://docs.datapizza.tech/guides/quick-start)** - Get up and running in minutes
-- 🏗️ **[Architecture Guide](https://docs.datapizza.tech/guides/architecture)** - Understanding the framework
 - 🎯 **[RAG Tutorial](https://docs.datapizza.tech/guides/rag)** - Build production RAG systems
 - 🤖 **[Agent Examples](https://docs.datapizza.tech/examples/agents)** - Real-world agent implementations
 
@@ -315,9 +310,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ by the DataPizza Team**
+**Built by Datapizza, the AI native company**
 
-*Building the future of AI, one slice at a time* 🍕
+*A framework made to be easy to learn, easy to maintain and ready for production* 🍕
 
 [⭐ Star us on GitHub](https://github.com/datapizza-labs/datapizza-ai) • [🚀 Get Started](https://docs.datapizza.tech) • [💬 Join Discord](https://discord.gg/s5sJNHz2C8)
 

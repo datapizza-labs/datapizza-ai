@@ -133,7 +133,6 @@ from datapizza.modules.prompt import ChatPromptTemplate
 from datapizza.modules.rewriters import ToolRewriter
 from datapizza.pipeline import DagPipeline
 from datapizza.vectorstores.qdrant import QdrantVectorstore
-from openai import OpenAIError
 
 openai_client = OpenAIClient(
     model="gpt-4o-mini",
@@ -146,7 +145,7 @@ query_rewriter = ToolRewriter(
 )
 
 embedder = OpenAIEmbedder(
-    api_key="YOUR_API_KEY"
+    api_key="YOUR_API_KEY",
     model_name="text-embedding-3-small"
 )
 retriever = QdrantVectorstore(host="localhost", port=6333).as_retriever(collection_name="my_documents", k=5)
