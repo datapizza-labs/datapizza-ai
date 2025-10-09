@@ -157,9 +157,9 @@ with ContextTracing().trace("my_ai_operation"):
 
 ## 🎯 Examples
 
+### 🌐 Multi-Agent System
 
-<details>
-<summary><b>🌐 Multy agent system</b></summary>
+Build sophisticated AI systems where multiple specialized agents collaborate to solve complex tasks. This example shows how to create a trip planning system with dedicated agents for weather information, web search, and planning coordination.
 
 ```sh
 # Install DuckDuckGo tool
@@ -208,10 +208,10 @@ print(response.text)
 
 ```
 
-</details>
 
-<details>
-<summary><b>📊 Document Ingestion</b></summary>
+### 📊 Document Ingestion
+
+Process and index documents for retrieval-augmented generation (RAG). This pipeline automatically parses PDFs, splits them into chunks, generates embeddings, and stores them in a vector database for efficient similarity search.
 
 ```python
 from datapizza.core.vectorstore import VectorConfig
@@ -242,13 +242,13 @@ results = vectorstore.search(query_vector = [0.0] * 1536, collection_name="my_do
 print(results)
 ```
 
-</details>
 
 
 
 
-<details>
-<summary><b>📊 RAG</b></summary>
+### 📊 RAG (Retrieval-Augmented Generation)
+
+Create a complete RAG pipeline that enhances AI responses with relevant document context. This example demonstrates query rewriting, embedding generation, document retrieval, and response generation in a connected workflow.
 
 ```python
 from datapizza.clients.openai import OpenAIClient
@@ -286,8 +286,6 @@ result = dag_pipeline.run({
 print(f"Generated response: {result['generator']}")
 ```
 
-</details>
-
 
 
 ## 🌐 Ecosystem
@@ -296,7 +294,8 @@ print(f"Generated response: {result['generator']}")
 
 <table>
 <tr>
-<td align="center"><img src="https://openai.com/favicon.ico" width="32"><br><b>OpenAI</b></td>
+<td align="center"><img src="https://unpkg.com/@lobehub/icons-static-svg@latest/icons/openai.svg" width="32"><br><b>OpenAI</b></td>
+
 <td align="center"><img src="https://www.google.com/favicon.ico" width="32"><br><b>Google Gemini</b></td>
 <td align="center"><img src="https://anthropic.com/favicon.ico" width="32"><br><b>Anthropic</b></td>
 <td align="center"><img src="https://mistral.ai/favicon.ico" width="32"><br><b>Mistral</b></td>
