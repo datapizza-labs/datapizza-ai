@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="DataPizza AI Logo" width="200" height="200">
+<img src="docs/assets/logo.png" alt="Datapizza AI Logo" width="200" height="200">
 
 **Build reliable Gen AI solutions without overhead**
 
@@ -18,13 +18,13 @@
 
 ---
 
-## 🌟 Why DataPizza AI?
+## 🌟 Why Datapizza AI?
 
 A framework that keeps your agents predictable, your debugging fast, and your code trusted in production. Built by Engineers, trusted by Engineers.
 
 <div align="center">
 
-### ⚡ **Less abstraction, more control** | 🚀 **API-first design** | 🔧 **Observable by default**
+### ⚡ **Less abstraction, more control** | 🚀 **API-first design** | 🔧 **Observable by design**
 
 </div>
 
@@ -47,7 +47,7 @@ print(result.text)
 
 <table>
 <tr>
-<td width="50%">
+<td width="50%" valign="top">
 
 ### 🎯 **API-first**
 - **Multi-Provider Support**: OpenAI, Google Gemini, Anthropic, Mistral, Azure
@@ -55,7 +55,7 @@ print(result.text)
 - **Memory Management**: Persistent conversations and context awareness
 
 </td>
-<td width="50%">
+<td width="50%" valign="top">
 
 ### 🔍 **Composable**
 - **Reusable blocks**: Declarative configuration, easy overrides
@@ -66,7 +66,7 @@ print(result.text)
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td width="50%" valign="top">
 
 ### 🔧 **Observable**
 - **OpenTelemetry tracing**: Standards-based instrumentation
@@ -74,7 +74,7 @@ print(result.text)
 - **Custom spans**: Trace fine-grained phases and sub-steps to pinpoint bottlenecks
 
 </td>
-<td width="50%">
+<td width="50%" valign="top">
 
 ### 🚀 **Vendor-Agnostic**
 - **Swap models**: Change providers without rewiring business logic
@@ -105,14 +105,17 @@ pip install datapizza-ai-clients-anthropic
 ```python
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
+from datapizza.tools import tool
 
-# Create an intelligent agent
+@tool
+def get_weather(city: str) -> str:
+    return f"The weather in {city} is sunny"
+
 client = OpenAIClient(api_key="YOUR_API_KEY")
-agent = Agent(name="assistant", client=client)
+agent = Agent(name="assistant", client=client, tools = [get_weather])
 
-# Start chatting
-response = agent.run("Explain quantum computing in simple terms")
-print(response.text)
+response = agent.run("What is the weather in Rome?")
+# output: The weather in Rome is sunny
 ```
 
 
