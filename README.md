@@ -4,7 +4,7 @@
 
 **Build reliable Gen AI solutions without overhead**
 
-*Written in Python. Designed for speed. A no-fluff GenAI framework that gets your agents from dev to prod, fast*
+_Written in Python. Designed for speed. A no-fluff GenAI framework that gets your agents from dev to prod, fast_
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/datapizza-ai.svg)](https://pypi.org/project/datapizza-ai/)
@@ -29,6 +29,7 @@ A framework that keeps your agents predictable, your debugging fast, and your co
 </div>
 
 ## How to install
+
 ```sh
 pip install datapizza-ai
 ```
@@ -50,6 +51,7 @@ print(result.text)
 <td width="50%" valign="top">
 
 ### 🎯 **API-first**
+
 - **Multi-Provider Support**: OpenAI, Google Gemini, Anthropic, Mistral, Azure
 - **Tool Integration**: Built-in web search, document processing, custom tools
 - **Memory Management**: Persistent conversations and context awareness
@@ -58,6 +60,7 @@ print(result.text)
 <td width="50%" valign="top">
 
 ### 🔍 **Composable**
+
 - **Reusable blocks**: Declarative configuration, easy overrides
 - **Document Processing**: PDF, DOCX, images with Azure AI & Docling
 - **Smart Chunking**: Context-aware text splitting and embedding
@@ -69,6 +72,7 @@ print(result.text)
 <td width="50%" valign="top">
 
 ### 🔧 **Observable**
+
 - **OpenTelemetry tracing**: Standards-based instrumentation
 - **Client I/O tracing**: Optional toggle to log inputs, outputs, and in-memory context
 - **Custom spans**: Trace fine-grained phases and sub-steps to pinpoint bottlenecks
@@ -77,6 +81,7 @@ print(result.text)
 <td width="50%" valign="top">
 
 ### 🚀 **Vendor-Agnostic**
+
 - **Swap models**: Change providers without rewiring business logic
 - **Clear Interfaces**: Predictable APIs across all components
 - **Rich Ecosystem**: Modular design with optional components
@@ -118,9 +123,7 @@ response = agent.run("What is the weather in Rome?")
 # output: The weather in Rome is sunny
 ```
 
-
-## 📊 Detailed Tracing 
-
+## 📊 Detailed Tracing
 
 A key requirement for principled development of LLM applications over your data (RAG systems, agents) is being able to observe and debug.
 
@@ -156,9 +159,7 @@ with ContextTracing().trace("my_ai_operation"):
 # ╰─────────────────────────────────────────────────────────────────────╯
 ```
 
-
 ![Demo](https://github.com/user-attachments/assets/02742e87-aa48-4308-94c8-6f362e3218b4)
-
 
 ## 🎯 Examples
 
@@ -170,7 +171,6 @@ Build sophisticated AI systems where multiple specialized agents collaborate to 
 # Install DuckDuckGo tool
 pip install datapizza-ai-tools-duckduckgo
 ```
-
 
 ```python
 from datapizza.agents.agent import Agent
@@ -200,7 +200,7 @@ web_search_agent = Agent(
 
 planner_agent = Agent(
     name="planner",
-    client=client, 
+    client=client,
     system_prompt="You are a trip planner. You should provide a plan for the user. Make sure to provide a detailed plan with the best places to visit and the best time to visit them."
 )
 
@@ -212,7 +212,6 @@ response = planner_agent.run(
 print(response.text)
 
 ```
-
 
 ### 📊 Document Ingestion
 
@@ -250,10 +249,6 @@ pipeline.run("sample.pdf")
 results = vectorstore.search(query_vector = [0.0] * 1536, collection_name="my_documents", k=5)
 print(results)
 ```
-
-
-
-
 
 ### 📊 RAG (Retrieval-Augmented Generation)
 
@@ -295,8 +290,6 @@ result = dag_pipeline.run({
 print(f"Generated response: {result['generator']}")
 ```
 
-
-
 ## 🌐 Ecosystem
 
 ### 🤖 Supported AI Providers
@@ -313,14 +306,14 @@ print(f"Generated response: {result['generator']}")
 
 ### 🔧 Tools & Integrations
 
-| Category | Components |
-|----------|------------|
-| **📄 Document Parsers** | Azure AI Document Intelligence, Docling |
-| **🔍 Vector Stores** | Qdrant |
-| **🎯 Rerankers** | Cohere, Together AI |
-| **🌐 Tools** | DuckDuckGo Search, Custom Tools |
-| **💾 Caching** | Redis integration for performance optimization |
-| **📊 Embedders** | OpenAI, Google, Cohere, FastEmbed |
+| Category                | Components                                     |
+| ----------------------- | ---------------------------------------------- |
+| **📄 Document Parsers** | Azure AI Document Intelligence, Docling        |
+| **🔍 Vector Stores**    | Qdrant                                         |
+| **🎯 Rerankers**        | Cohere, Together AI                            |
+| **🌐 Tools**            | DuckDuckGo Search, Custom Tools                |
+| **💾 Caching**          | Redis integration for performance optimization |
+| **📊 Embedders**        | OpenAI, Google, Cohere, FastEmbed              |
 
 ## 🎓 Learning Resources
 
@@ -330,22 +323,60 @@ print(f"Generated response: {result['generator']}")
 
 ## 🤝 Community
 
-
-- 💬 **[Discord Community](https://discord.gg/s5sJNHz2C8)** 
-- 📚 **[Documentation](https://docs.datapizza.ai)** 
-- 📧 **[GitHub Issues](https://github.com/datapizza-labs/datapizza-ai/issues)** 
-- 🐦 **[Twitter](https://x.com/datapizza_ai)** 
+- 💬 **[Discord Community](https://discord.gg/s5sJNHz2C8)**
+- 📚 **[Documentation](https://docs.datapizza.ai)**
+- 📧 **[GitHub Issues](https://github.com/datapizza-labs/datapizza-ai/issues)**
+- 🐦 **[Twitter](https://x.com/datapizza_ai)**
 
 ### 🌟 Contributing
 
 We love contributions! Whether it's:
 
 - 🐛 **Bug Reports** - Help us improve
-- 💡 **Feature Requests** - Share your ideas  
+- 💡 **Feature Requests** - Share your ideas
 - 📝 **Documentation** - Make it better for everyone
 - 🔧 **Code Contributions** - Build the future together
 
 Check out our [Contributing Guide](CONTRIBUTING.md) to get started.
+
+## 🔧 Development Guidelines
+
+### Conventional Commits
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+**Format:**
+
+```
+<type>: <description>
+```
+
+**Types:**
+
+- `feat`: New features
+- `fix`: Bug fixes
+- `docs`: Documentation changes
+- `refactor`: Code refactoring
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks
+- `ci`: CI/CD changes
+- `build`: Build system changes
+- `perf`: Performance improvements
+
+### Pre-commit Setup
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+### Contributing Workflow
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feat/your-feature`
+3. Commit with conventional format: `git commit -m "feat: add feature"`
+4. Push and create Pull Request
 
 ## 📄 License
 
@@ -357,7 +388,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built by Datapizza, the AI native company**
 
-*A framework made to be easy to learn, easy to maintain and ready for production* 🍕
+_A framework made to be easy to learn, easy to maintain and ready for production_ 🍕
 
 [⭐ Star us on GitHub](https://github.com/datapizza-labs/datapizza-ai) • [🚀 Get Started](https://docs.datapizza.ai) • [💬 Join Discord](https://discord.gg/s5sJNHz2C8)
 

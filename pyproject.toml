@@ -127,3 +127,13 @@ select = [
     "C4",  # flake8-comprehensions
 ]
 
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+# isort configuration
+[tool.isort]
+profile = "black"
+line_length = 88
+
