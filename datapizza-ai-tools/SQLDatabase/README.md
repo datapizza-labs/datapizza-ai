@@ -97,8 +97,7 @@ conn.close()
 db_tools = SQLDatabase(db_uri=db_uri)
 
 # 2. Initialize a client (e.g., OpenAI)
-# Make sure to set your OPENAI_API_KEY environment variable
-client = OpenAIClient()
+client = OpenAIClient(api_key="YOUR_API_KEY")
 
 # 3. Create an agent and provide it with the database tools
 agent = Agent(
