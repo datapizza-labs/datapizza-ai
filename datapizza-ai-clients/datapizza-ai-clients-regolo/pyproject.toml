@@ -5,23 +5,24 @@ build-backend = "hatchling.build"
 
 # Project metadata
 [project]
-name = "datapizza-ai-tools-duckduckgo"
-version = "0.0.3"
-description = "Azure Document Intelligence parser for the datapizza-ai framework"
+name = "datapizza-ai-clients-regolo"
+version = "0.0.1"
+description = "Regolo.ai client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Datapizza", email = "datapizza@datapizza.tech"}
+    {name = "Regolo Team", email = "dev@regolo.ai"}
 ]
-requires-python = ">=3.10.0,<4" 
+requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "openai>=1.0.0",
+    "httpx>=0.23.0",
     "datapizza-ai-core>=0.0.1",
-    "ddgs>=9.6.0",
 ]
 
 # Development dependencies
@@ -34,11 +35,11 @@ dev = [
 
 # Hatch build configuration
 [tool.hatch.build.targets.sdist]
-include = ["/datapizza"]
+include = ["datapizza"]
 exclude = ["**/BUILD"]
 
 [tool.hatch.build.targets.wheel]
-include = ["/datapizza"]
+include = ["datapizza"]
 exclude = ["**/BUILD"]
 
 # Ruff configuration
@@ -47,13 +48,14 @@ line-length = 88
 
 [tool.ruff.lint]
 select = [
-    # "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "B",   # flake8-bugbear
-    "I",   # isort
-    "UP",  # pyupgrade
-    "SIM", # flake8-simplify
-    "RUF", # Ruff-specific rules
-    "C4",  # flake8-comprehensions
+    "W",
+    "F",
+    "B",
+    "I",
+    "UP",
+    "SIM",
+    "RUF",
+    "C4",
 ]
+
+

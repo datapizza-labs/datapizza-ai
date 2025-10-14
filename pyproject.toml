@@ -22,7 +22,9 @@ classifiers = [
 dependencies = [
     "datapizza-ai-core>=0.0.1",
     "datapizza-ai-clients-openai>=0.0.1",
+    "datapizza-ai-clients-regolo>=0.0.1",
     "datapizza-ai-embedders-openai>=0.0.1",
+    "datapizza-ai-embedders-regolo>=0.0.1",
     "datapizza-ai-vectorstores-qdrant>=0.0.1",
 ]
 
@@ -46,12 +48,14 @@ members = [
     "datapizza-ai-clients/datapizza-ai-clients-mistral",
     "datapizza-ai-clients/datapizza-ai-clients-openai",
     "datapizza-ai-clients/datapizza-ai-clients-openai-like",
+    "datapizza-ai-clients/datapizza-ai-clients-regolo",
     
     # Embedders
     "datapizza-ai-embedders/cohere",
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
     "datapizza-ai-embedders/openai",
+    "datapizza-ai-embedders/regolo",
     
     # Modules
     "datapizza-ai-modules/parsers/azure",
@@ -79,12 +83,14 @@ datapizza-ai-clients-google = {workspace = true}
 datapizza-ai-clients-mistral = {workspace = true}
 datapizza-ai-clients-openai = {workspace = true}
 datapizza-ai-clients-openai-like = {workspace = true}
+datapizza-ai-clients-regolo = {workspace = true}
 
 # Embedders
 datapizza-ai-embedders-cohere = {workspace = true}
 datapizza-ai-embedders-fastembedder = {workspace = true}
 datapizza-ai-embedders-google = {workspace = true}
 datapizza-ai-embedders-openai = {workspace = true}
+datapizza-ai-embedders-regolo = {workspace = true}
 
 # Modules
 datapizza-ai-parsers-azure = {workspace = true}

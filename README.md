@@ -98,6 +98,7 @@ pip install datapizza-ai
 pip install datapizza-ai-clients-openai
 pip install datapizza-ai-clients-google
 pip install datapizza-ai-clients-anthropic
+pip install datapizza-ai-clients-regolo
 ```
 
 ### Start with Agent
@@ -304,6 +305,7 @@ print(f"Generated response: {result['generator']}")
 <td align="center"><img src="https://anthropic.com/favicon.ico" width="32"><br><b>Anthropic</b></td>
 <td align="center"><img src="https://mistral.ai/favicon.ico" width="32"><br><b>Mistral</b></td>
 <td align="center"><img src="https://azure.microsoft.com/favicon.ico" width="32"><br><b>Azure OpenAI</b></td>
+<td align="center"><img src="https://regolo.ai/favicon.ico" width="32"><br><b>Regolo</b></td>
 </tr>
 </table>
 
