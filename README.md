@@ -38,7 +38,7 @@ pip install datapizza-ai
 ```python
 from datapizza.clients.openai import OpenAIClient
 
-client=OpenAIClient(api_key="YOUR_API_KEY")
+client = OpenAIClient(api_key="YOUR_API_KEY")
 result = client.invoke("Hi, how are u?")
 print(result.text)
 ```
@@ -119,7 +119,7 @@ response = agent.run("What is the weather in Rome?")
 ```
 
 
-## 📊 Detailed Tracing 
+## 📊 Detailed Tracing
 
 
 A key requirement for principled development of LLM applications over your data (RAG systems, agents) is being able to observe and debug.
@@ -200,7 +200,7 @@ web_search_agent = Agent(
 
 planner_agent = Agent(
     name="planner",
-    client=client, 
+    client=client,
     system_prompt="You are a trip planner. You should provide a plan for the user. Make sure to provide a detailed plan with the best places to visit and the best time to visit them."
 )
 
@@ -252,9 +252,6 @@ print(results)
 ```
 
 
-
-
-
 ### 📊 RAG (Retrieval-Augmented Generation)
 
 Create a complete RAG pipeline that enhances AI responses with relevant document context. This example demonstrates query rewriting, embedding generation, document retrieval, and response generation in a connected workflow.
@@ -273,10 +270,10 @@ openai_client = OpenAIClient(
 )
 
 dag_pipeline = DagPipeline()
-dag_pipeline.add_module("rewriter",  ToolRewriter( client=openai_client, system_prompt="Rewrite user queries to improve retrieval accuracy." ))
-dag_pipeline.add_module("embedder", OpenAIEmbedder( api_key= "YOUR_API_KEY", model_name="text-embedding-3-small" ))
+dag_pipeline.add_module("rewriter", ToolRewriter(client=openai_client, system_prompt="Rewrite user queries to improve retrieval accuracy."))
+dag_pipeline.add_module("embedder", OpenAIEmbedder(api_key= "YOUR_API_KEY", model_name="text-embedding-3-small"))
 dag_pipeline.add_module("retriever", QdrantVectorstore(host="localhost", port=6333).as_retriever(collection_name="my_documents", k=5))
-dag_pipeline.add_module("prompt", ChatPromptTemplate( user_prompt_template="User question: {{user_prompt}}\n:", retrieval_prompt_template="Retrieved content:\n{% for chunk in chunks %}{{ chunk.text }}\n{% endfor %}"))
+dag_pipeline.add_module("prompt", ChatPromptTemplate(user_prompt_template="User question: {{user_prompt}}\n:", retrieval_prompt_template="Retrieved content:\n{% for chunk in chunks %}{{ chunk.text }}\n{% endfor %}"))
 dag_pipeline.add_module("generator", openai_client)
 
 dag_pipeline.connect("rewriter", "embedder", target_key="text")
@@ -294,7 +291,6 @@ result = dag_pipeline.run({
 
 print(f"Generated response: {result['generator']}")
 ```
-
 
 
 ## 🌐 Ecosystem
@@ -331,17 +327,17 @@ print(f"Generated response: {result['generator']}")
 ## 🤝 Community
 
 
-- 💬 **[Discord Community](https://discord.gg/s5sJNHz2C8)** 
-- 📚 **[Documentation](https://docs.datapizza.ai)** 
-- 📧 **[GitHub Issues](https://github.com/datapizza-labs/datapizza-ai/issues)** 
-- 🐦 **[Twitter](https://x.com/datapizza_ai)** 
+- 💬 **[Discord Community](https://discord.gg/s5sJNHz2C8)**
+- 📚 **[Documentation](https://docs.datapizza.ai)**
+- 📧 **[GitHub Issues](https://github.com/datapizza-labs/datapizza-ai/issues)**
+- 🐦 **[Twitter](https://x.com/datapizza_ai)**
 
 ### 🌟 Contributing
 
 We love contributions! Whether it's:
 
 - 🐛 **Bug Reports** - Help us improve
-- 💡 **Feature Requests** - Share your ideas  
+- 💡 **Feature Requests** - Share your ideas
 - 📝 **Documentation** - Make it better for everyone
 - 🔧 **Code Contributions** - Build the future together
 

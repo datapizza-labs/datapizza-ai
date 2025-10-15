@@ -303,6 +303,7 @@ class Agent:
                 break
 
             current_steps += 1
+            original_task = ""
 
         # Yield final answer if we have one
         if final_answer:
@@ -373,6 +374,7 @@ class Agent:
 
             # task_input = None
             current_steps += 1
+            original_task = ""
 
         # Yield final answer if we have one
         if final_answer:

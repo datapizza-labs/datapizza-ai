@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-parsers-azure"
-version = "0.0.2"
+version = "0.0.3"
 description = "Azure Document Intelligence parser for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core==0.0.1",
+    "datapizza-ai-core>=0.0.1",
     "aiofiles>=24.1.0",
     "azure-ai-documentintelligence>=1.0.1,<2.0.0",
     "pymupdf>=1.25.4,<2.0.0",
