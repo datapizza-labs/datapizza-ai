@@ -5,28 +5,23 @@ build-backend = "hatchling.build"
 
 # Project metadata
 [project]
-name = "datapizza-ai-core"
-version = "0.0.4"
-description = "Core components for the datapizza-ai framework"
+name = "datapizza-ai-tools-sqldatabase"
+version = "0.0.1"
+description = "A tool to interact with SQL databases for the datapizza-ai framework."
 readme = "README.md"
 license = {text = "MIT"}
-
-requires-python = ">=3.10.0,<3.14" 
+authors = [
+    {name = "Nilthon Jhon Rojas Apumayta", email = "oneill.jhon97@gmail.com"}
+]
+requires-python = ">=3.10.0,<4" 
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "opentelemetry-api>=1.33.1",
-    "opentelemetry-sdk>=1.33.1",
-    "pydantic>=2.10.5,<3.0.0",
-    "python-dotenv==1.0.1",
-    "pyyaml>=6.0.2",
-    "rich>=14.1.0",
-    "typing-extensions>=4.12.2,<5.0.0",
-    "jsonref>=1.1.0",
-    "jinja2>=3.1.6",
+    "datapizza-ai-core>=0.0.1",
+    "sqlalchemy>=2.0.44",
 ]
 
 # Development dependencies
@@ -39,11 +34,11 @@ dev = [
 
 # Hatch build configuration
 [tool.hatch.build.targets.sdist]
-include = ["datapizza"]
+include = ["/datapizza"]
 exclude = ["**/BUILD"]
 
 [tool.hatch.build.targets.wheel]
-include = ["datapizza"]
+include = ["/datapizza"]
 exclude = ["**/BUILD"]
 
 # Ruff configuration
