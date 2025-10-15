@@ -66,7 +66,8 @@ members = [
     "datapizza-ai-cache/redis",
 
     # Tools
-    "datapizza-ai-tools/duckduckgo"
+    "datapizza-ai-tools/duckduckgo",
+    "datapizza-ai-tools/filesystem"
 ]
 
 [tool.uv.sources]
@@ -100,6 +101,7 @@ datapizza-ai-cache-redis = {workspace = true}
 
 # Tools
 datapizza-ai-tools-duckduckgo = {workspace = true}
+datapizza-ai-tools-filesystem = {workspace = true}
 
 # Hatch build configuration
 [tool.hatch.build.targets.sdist]
