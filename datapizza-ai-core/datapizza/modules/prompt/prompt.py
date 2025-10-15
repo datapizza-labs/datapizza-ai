@@ -1,6 +1,7 @@
 import uuid
 
 from jinja2 import Template
+from jinja2.sandbox import SandboxedEnvironment
 
 from datapizza.core.modules.prompt import Prompt
 from datapizza.memory.memory import Memory
@@ -25,8 +26,10 @@ class ChatPromptTemplate(Prompt):
     """
 
     def __init__(self, user_prompt_template, retrieval_prompt_template):
-        self.user_prompt_template = Template(user_prompt_template)
-        self.retrieval_prompt_template = Template(retrieval_prompt_template)
+        env = SandboxedEnvironment()
+
+        self.user_prompt_template = env.from_string(user_prompt_template)
+        self.retrieval_prompt_template = env.from_string(retrieval_prompt_template)
 
     def format(
         self,
