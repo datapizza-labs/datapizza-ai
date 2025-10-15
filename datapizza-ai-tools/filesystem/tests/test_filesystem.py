@@ -138,30 +138,30 @@ def test_copy_file(fs_tool, tmp_path):
     assert "not found" in result_non_existent
 
 
-def test_replace_all_in_file_single_occurrence(fs_tool, tmp_path):
-    file_path = tmp_path / "test_replace.txt"
-    file_path.write_text("hello world")
-    result = fs_tool.replace_all_in_file(str(file_path), "hello", "hi")
-    assert "Successfully replaced all occurrences" in result
-    assert file_path.read_text() == "hi world"
+def test_replace_in_file_success(fs_tool, tmp_path):
+    file_path = tmp_path / "test_replace_success.txt"
+    file_path.write_text("hello world\nthis is a unique line")
+    result = fs_tool.replace_in_file(str(file_path), "this is a unique line", "this is a replaced line")
+    assert "Replacement successful in file" in result
+    assert file_path.read_text() == "hello world\nthis is a replaced line"
 
 
-def test_replace_all_in_file_no_occurrence(fs_tool, tmp_path):
-    file_path = tmp_path / "test_replace_no.txt"
+def test_replace_in_file_not_found(fs_tool, tmp_path):
+    file_path = tmp_path / "test_replace_not_found.txt"
     file_path.write_text("hello world")
-    result = fs_tool.replace_all_in_file(str(file_path), "goodbye", "bye")
+    result = fs_tool.replace_in_file(str(file_path), "goodbye", "bye")
     assert "not found" in result
     assert file_path.read_text() == "hello world"
 
 
-def test_replace_all_in_file_multiple_occurrences(fs_tool, tmp_path):
-    file_path = tmp_path / "test_replace_multi.txt"
-    file_path.write_text("hello hello world")
-    result = fs_tool.replace_all_in_file(str(file_path), "hello", "hi")
-    assert "Successfully replaced all occurrences" in result
-    assert file_path.read_text() == "hi hi world"
+def test_replace_in_file_multiple_occurrences(fs_tool, tmp_path):
+    file_path = tmp_path / "test_replace_multiple.txt"
+    file_path.write_text("hello world\nhello world")
+    result = fs_tool.replace_in_file(str(file_path), "hello world", "hi world")
+    assert "2 occurrences found" in result and "requires a unique match" in result
+    assert file_path.read_text() == "hello world\nhello world"
 
 
-def test_replace_all_in_file_not_found(fs_tool):
-    result = fs_tool.replace_all_in_file("non_existent.txt", "a", "b")
-    assert "not found" in result
+def test_replace_in_file_file_not_found(fs_tool):
+    result = fs_tool.replace_in_file("non_existent.txt", "a", "b")
+    assert "File 'non_existent.txt' not found" in result

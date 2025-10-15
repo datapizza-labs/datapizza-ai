@@ -15,7 +15,7 @@ This tool provides a robust and easy-to-use interface for `datapizza-ai` agents 
 
 > **⚠️ Warning: Risk of Data Loss and System Modification**
 >
-> Operations performed by this tool directly affect your local file system. Using functions like `delete_file`, `delete_directory`, `write_file`, `move_item`, and `replace_all_in_file` can lead to permanent data loss or unintended system modifications if not used carefully. Exercise extreme caution. Before performing critical operations, consider the following:
+> Operations performed by this tool directly affect your local file system. Using functions like `delete_file`, `delete_directory`, and `write_file` can lead to permanent data loss or unintended system modifications if not used carefully. Exercise extreme caution. Before performing critical operations, consider the following:
 >
 > - Always double-check the paths and parameters.
 > - Test operations in a safe, isolated environment (e.g., a temporary directory).
@@ -33,7 +33,7 @@ The `FileSystem` is a class that, once initialized, exposes several distinct fun
 6.  `delete_directory(path: str, recursive: bool = False)`: Deletes a specified directory. If `recursive` is True, deletes the directory and all its contents. Returns a success or error message.
 7.  `move_item(source_path: str, destination_path: str)`: Moves or renames a file or directory from `source_path` to `destination_path`. Returns a success or error message.
 8.  `copy_file(source_path: str, destination_path: str)`: Copies a file from `source_path` to `destination_path`. Returns a success or error message.
-9.  `replace_all_in_file(file_path: str, old_string: str, new_string: str)`: Replaces all occurrences of `old_string` with `new_string` in a specified file. Returns a success or error message.
+9.  `replace_in_file(file_path: str, old_string: str, new_string: str)`: Replaces a string in a file only if it appears exactly once. For safety, `old_string` should contain context to be unique.
 
 ## 🚀 Quick Start
 
@@ -99,7 +99,7 @@ Follow these steps:
 5.  Use `delete_file` or `delete_directory` to remove items.
 6.  Use `move_item` to rename or move files/directories.
 7.  Use `copy_file` to duplicate files.
-8.  Use `replace_all_in_file` to modify file content.
+8.  Use `replace_in_file` to modify file content. 
 
 """,
     tools=[
@@ -111,7 +111,7 @@ Follow these steps:
         fs_tool.delete_directory,
         fs_tool.move_item,
         fs_tool.copy_file,
-        fs_tool.replace_all_in_file,
+        fs_tool.replace_in_file,
     ]
 )
 
@@ -141,7 +141,7 @@ response = agent.run(f"Copy 'initial_file.txt' from {temp_dir_path} to {temp_dir
 print(f"Agent Response: {response.text}")
 
 print("--- Query 7: Replace content in a file ---")
-response = agent.run(f"In the file '{temp_dir_path}/initial_file.txt', replace all occurrences of 'initial' with 'updated'")
+response = agent.run(f"In the file '{temp_dir_path}/initial_file.txt', replace the unique string 'initial content' with 'updated content'")
 print(f"Agent Response: {response.text}")
 
 print("--- Query 8: Delete a file ---")
@@ -186,7 +186,7 @@ Agent Response: Successfully moved '/tmp/tmp_XXXXXX/new_document.txt' to '/tmp/t
 Agent Response: Successfully copied '/tmp/tmp_XXXXXX/initial_file.txt' to '/tmp/tmp_XXXXXX/reports/initial_file_copy.txt'.
 
 --- Query 7: Replace content in a file ---
-Agent Response: Successfully replaced all occurrences in '/tmp/tmp_XXXXXX/initial_file.txt'.
+Agent Response: Replacement successful in file '/tmp/tmp_XXXXXX/initial_file.txt'.
 
 --- Query 8: Delete a file ---
 Agent Response: Successfully deleted file '/tmp/tmp_XXXXXX/reports/initial_file_copy.txt'.

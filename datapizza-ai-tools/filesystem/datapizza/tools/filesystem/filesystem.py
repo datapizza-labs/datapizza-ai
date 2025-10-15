@@ -138,26 +138,34 @@ class FileSystem:
             return f"An error occurred while copying '{source_path}' to '{destination_path}': {e}"
 
     @tool
-    def replace_all_in_file(self, file_path: str, old_string: str, new_string: str) -> str:
+    def replace_in_file(self, file_path: str, old_string: str, new_string: str) -> str:
         """
-        Replaces all occurrences of a string in a file.
+        Replaces a string in a file, but only if it appears exactly once.
+        To ensure precision, the 'old_string' should include enough context (e.g., surrounding lines)
+        to uniquely identify the target location.
+
         :param file_path: The path of the file to modify.
-        :param old_string: The string to be replaced.
-        :param new_string: The string to replace with.
+        :param old_string: The exact block of text to be replaced (including context).
+        :param new_string: The new block of text to insert.
         """
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            if old_string not in content:
-                return f"Error: String to be replaced '{old_string}' was not found in the file."
+            occurrences = content.count(old_string)
 
-            new_content = content.replace(old_string, new_string)
+            if occurrences == 0:
+                return f"Error: The specified 'old_string' was not found in the file '{file_path}'. No changes were made."
+            
+            if occurrences > 1:
+                return f"Error: {occurrences} occurrences found in '{file_path}'. Replacement requires a unique match."
+
+            new_content = content.replace(old_string, new_string, 1)
 
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
-            return f"Successfully replaced all occurrences in '{file_path}'."
+            return f"Replacement successful in file '{file_path}'."
 
         except FileNotFoundError:
             return f"Error: File '{file_path}' not found."
