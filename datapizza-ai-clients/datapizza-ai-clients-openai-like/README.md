@@ -44,6 +44,23 @@ response = client.invoke("Explain quantum computing")
 print(response.content)
 ```
 
+### With OpenRouter
+
+```python
+import os
+from datapizza.clients.openai_like import OpenAILikeClient
+
+client = OpenAILikeClient(
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    model="google/gemma-7b-it",
+    system_prompt="You are a helpful assistant.",
+    base_url="https://openrouter.ai/api/v1",
+)
+
+response = client.invoke("What is OpenRouter?")
+print(response.content)
+```
+
 ### With Other OpenAI-Compatible Services
 
 ```python
@@ -74,6 +91,7 @@ print(response.content)
 
 - **Ollama** - Local model inference
 - **Together AI** - Cloud-based model hosting
+- **OpenRouter** - Access a variety of models through a single API
 - **Perplexity AI** - Search-augmented models
 - **Groq** - Fast inference API
 - **Any OpenAI-compatible API**

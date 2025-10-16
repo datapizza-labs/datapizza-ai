@@ -7,7 +7,6 @@ from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.tools.tool_converter import ToolConverter
 from datapizza.type import (
     FunctionCallBlock,
     Model,
@@ -146,9 +145,18 @@ class OpenAIClient(Client):
             cached_tokens_used=cached_tokens or 0,
         )
 
-    def _convert_tools(self, tools: Tool) -> dict:
+    def _convert_tools(self, tool: Tool) -> dict:
         """Convert tools to OpenAI function format"""
-        return ToolConverter.to_openai_format(tools)
+        return {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": {
+                "type": "object",
+                "properties": tool.properties,
+                "required": tool.required,
+            },
+        }
 
     def _convert_tool_choice(
         self, tool_choice: Literal["auto", "required", "none"] | list[str]

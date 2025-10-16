@@ -8,7 +8,7 @@ The `Agent` class is the core component for creating autonomous AI agents in Dat
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
 from datapizza.memory import Memory
-from datapizza.tools import Tool
+from datapizza.tools import tool
 
 agent = Agent(
     name="my_agent",
@@ -16,7 +16,7 @@ agent = Agent(
     client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
     # tools=[],
     # max_steps=10,
-    # terminate_on_text=True,  # Terminate execution when the client return a plain text 
+    # terminate_on_text=True,  # Terminate execution when the client return a plain text
     # memory=memory,
     # stream=False,
     # planning_interval=0
@@ -35,16 +35,14 @@ The above agent is quite basic, so let's make it more functional by adding [**to
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
 from datapizza.memory import Memory
-from datapizza.tools import Tool
 from datapizza.tools import tool
-
 
 @tool
 def get_weather(location: str, when: str) -> str:
     """Retrieves weather information for a specified location and time."""
     return "25 °C"
 
-agent = Agent(name= "weather_agent",tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
+agent = Agent(name="weather_agent", tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
 response = agent.run("What's the weather tomorrow in Milan?")
 
 print(response.text)
@@ -57,7 +55,7 @@ print(response.text)
 
 You can set the parameter `tool_choice` at invoke time.
 
-The accepted values are :  `auto`, `required`, `none`, `required_first`,  `list["tool_name"]`
+The accepted values are: `auto`, `required`, `none`, `required_first`, `list["tool_name"]`
 
 
 ```python
@@ -66,10 +64,10 @@ res = master_agent.run(
 )
 ```
 
-- `auto` : the model will decide if use a tool or not.
-- `required_first` : force to use a tool only at the first step, then auto.
-- `required` : force to use a tool at every step.
-- `none` : force to not use any tool.
+- `auto`: the model will decide if use a tool or not.
+- `required_first`: force to use a tool only at the first step, then auto.
+- `required`: force to use a tool at every step.
+- `none`: force to not use any tool.
 
 
 
@@ -93,7 +91,6 @@ Stream the agent's execution process, yielding intermediate steps. (Do not strea
 from datapizza.agents.agent import Agent, StepResult
 from datapizza.clients.openai import OpenAIClient
 from datapizza.memory import Memory
-from datapizza.tools import Tool
 from datapizza.tools import tool
 
 @tool
@@ -101,7 +98,7 @@ def get_weather(location: str, when: str) -> str:
     """Retrieves weather information for a specified location and time."""
     return "25 °C"
 
-agent = Agent(name= "weather_agent",tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
+agent = Agent(name="weather_agent", tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
 
 for step in agent.stream_invoke("What's the weather tomorrow in Milan?"):
     print(f"Step {step.index} starting...")
@@ -118,7 +115,7 @@ import asyncio
 
 async def main():
 
-    agent = Agent(name= "agent", client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
+    agent = Agent(name="agent", client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
     return await agent.a_run("Process this request")
 
 
@@ -160,12 +157,12 @@ client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1")
 
 @tool
 def get_weather(city: str) -> str:
-    return f""" Monday's weather in {city} is cloudy. 
+    return f""" Monday's weather in {city} is cloudy.
                 Tuesday's weather in {city} is rainy.
                 Wednesday's weather in {city} is sunny
-                Thursday's weather in {city} is cloudy, 
-                Friday's weather in {city} is rainy, 
-                Saturday's weather in {city} is sunny 
+                Thursday's weather in {city} is cloudy,
+                Friday's weather in {city} is rainy,
+                Saturday's weather in {city} is sunny
                 and Sunday's weather in {city} is cloudy."""
 
 weather_agent = Agent(
@@ -177,7 +174,7 @@ weather_agent = Agent(
 
 planner_agent = Agent(
     name="planner",
-    client=client, 
+    client=client,
     system_prompt="You are a trip planner. Use weather and analysis info to make recommendations."
 )
 
@@ -205,12 +202,12 @@ class MasterAgent(Agent):
     def call_weather_expert(self, task_to_ask: str) -> str:
         @tool
         def get_weather(city: str) -> str:
-            return f""" Monday's weather in {city} is cloudy. 
+            return f""" Monday's weather in {city} is cloudy.
                         Tuesday's weather in {city} is rainy.
                         Wednesday's weather in {city} is sunny
-                        Thursday's weather in {city} is cloudy, 
-                        Friday's weather in {city} is rainy, 
-                        Saturday's weather in {city} is sunny 
+                        Thursday's weather in {city} is cloudy,
+                        Friday's weather in {city} is rainy,
+                        Saturday's weather in {city} is sunny
                         and Sunday's weather in {city} is cloudy."""
 
         weather_agent = Agent(
@@ -221,7 +218,7 @@ class MasterAgent(Agent):
         )
         res = weather_agent.run(task_to_ask)
         return res.text
-    
+
 master_agent = MasterAgent(
     client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1"),
 )

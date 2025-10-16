@@ -68,7 +68,7 @@ class ContactInfo(BaseModel):
     company: str
 
 text = """
-Hi, I'm John Smith from TechCorp. 
+Hi, I'm John Smith from TechCorp.
 You can reach me at john.smith@techcorp.com or call 555-0123.
 """
 

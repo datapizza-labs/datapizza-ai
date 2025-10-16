@@ -5,15 +5,15 @@ build-backend = "hatchling.build"
 
 # Project metadata
 [project]
-name = "datapizza-ai-clients-openai-like"
-version = "0.0.3"
-description = "OpenAI client for the datapizza-ai framework"
+name = "datapizza-ai-tools-filesystem"
+version = "0.0.1"
+description = "A tool for interacting with the local file system."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Datapizza", email = "datapizza@datapizza.tech"}
+    {name = "Nilthon Jhon Rojas Apumayta", email = "oneill.jhon97@gmail.com"}
 ]
-requires-python = ">=3.10.0,<4" 
+requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -21,8 +21,6 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.0.1",
-    "httpx>=0.28.1",
-    "openai>=1.63.2,<2.0.0",
 ]
 
 # Development dependencies
@@ -35,11 +33,11 @@ dev = [
 
 # Hatch build configuration
 [tool.hatch.build.targets.sdist]
-include = ["datapizza"]
+include = ["/datapizza"]
 exclude = ["**/BUILD"]
 
 [tool.hatch.build.targets.wheel]
-include = ["datapizza"]
+include = ["/datapizza"]
 exclude = ["**/BUILD"]
 
 # Ruff configuration

@@ -108,7 +108,7 @@ Now that you know the basics, explore our specialized guides:
 ### 📸 [Multimodality Guide](multimodality.md)
 Work with images, PDFs, and other media types for visual AI applications.
 
-### 🌊 [Streaming Guide](streaming.md) 
+### 🌊 [Streaming Guide](streaming.md)
 Build responsive applications with real-time text generation and streaming.
 
 ### 🛠️ [Tools Guide](tools.md)

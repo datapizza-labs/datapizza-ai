@@ -9,7 +9,6 @@ from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.tools.tool_converter import ToolConverter
 from datapizza.type import (
     FunctionCallBlock,
     Media,
@@ -21,7 +20,7 @@ from datapizza.type import (
 from mistralai import Mistral
 from mistralai.models.ocrresponse import OCRResponse
 
-from datapizza.clients.mistral.memory_adapter import MistralMemoryAdapter
+from .memory_adapter import MistralMemoryAdapter
 
 log = logging.getLogger(__name__)
 
@@ -112,7 +111,7 @@ class MistralClient(Client):
 
     def _convert_tools(self, tools: Tool) -> dict:
         """Convert tools to Mistral function format"""
-        return ToolConverter.to_mistral_format(tools)
+        return {"type": "function", "function": tools.schema}
 
     def _convert_tool_choice(
         self, tool_choice: Literal["auto", "required", "none"] | list[str]

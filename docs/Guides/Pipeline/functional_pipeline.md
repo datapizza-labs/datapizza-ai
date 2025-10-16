@@ -87,7 +87,7 @@ modules:
     type: CSVLoader
     params:
       encoding: "utf-8"
-  
+
   - name: transformer
     module: my_package.transformers
     type: StandardTransformer
@@ -98,7 +98,7 @@ pipeline:
     node: data_loader
     kwargs:
       filepath: "data.csv"
-  
+
   - type: then
     name: transform
     node: transformer
@@ -166,7 +166,7 @@ And now create and execute the pipeline
 pipeline = (FunctionalPipeline()
     .run(name="rewriter", node=rewriter, kwargs={"user_prompt": "tell me something about this document"})
     .then(name="embedder", node=embedder, target_key="text")
-    .then(name="vector_store", node=vector_store, target_key="query_vector", 
+    .then(name="vector_store", node=vector_store, target_key="query_vector",
           kwargs={"collection_name": "my_documents", "k": 4})
     .then(name="prompt_template", node=prompt_template, target_key="chunks" , kwargs={"user_prompt": "tell me something about this document"})
     .then(name="generator", node=generator, target_key="memory", kwargs={"input": "tell me something about this document"})

@@ -5,7 +5,6 @@ from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.tools.tool_converter import ToolConverter
 from datapizza.type import (
     FunctionCallBlock,
     Model,
@@ -95,7 +94,17 @@ class GoogleClient(Client):
 
     def _convert_tool(self, tool: Tool) -> dict:
         """Convert tools to Google function format"""
-        return ToolConverter.to_google_format(tool)
+        parameters = {
+            "type": tool.schema["parameters"]["type"],
+            "properties": tool.schema["parameters"]["properties"],
+            "required": tool.schema["parameters"]["required"],
+        }
+
+        return {
+            "name": tool.schema["name"],
+            "description": tool.schema["description"],
+            "parameters": parameters,
+        }
 
     def _prepare_tools(self, tools: list[Tool] | None) -> list[types.Tool] | None:
         if not tools:
