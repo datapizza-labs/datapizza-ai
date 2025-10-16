@@ -1,0 +1,482 @@
+from __future__ import annotations
+
+import json
+from collections.abc import AsyncIterator, Iterator
+from typing import Any, Literal
+
+import httpx
+from datapizza.core.cache import Cache
+from datapizza.core.clients import Client, ClientResponse
+from datapizza.memory import Memory
+from datapizza.tools.tool_converter import ToolConverter
+from datapizza.tools.tools import Tool
+from datapizza.type import (
+    FunctionCallBlock,
+    Media,
+    MediaBlock,
+    Model,
+    StructuredBlock,
+    TextBlock,
+)
+from openai import AsyncOpenAI, OpenAI
+
+from .memory_adapter import RegoloMemoryAdapter
+
+
+class RegoloClient(Client):
+    """Client for Regolo.ai API (OpenAI-compatible).
+
+    Base URL: https://api.regolo.ai/v1
+    Auth: Authorization: Bearer <API_KEY>
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        system_prompt: str = "",
+        temperature: float | None = None,
+        cache: Cache | None = None,
+        base_url: str | httpx.URL | None = None,
+    ) -> None:
+        if temperature and not 0 <= temperature <= 2:
+            raise ValueError("Temperature must be between 0 and 2")
+
+        super().__init__(
+            model_name=model,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            cache=cache,
+        )
+
+        self.base_url = base_url or "https://api.regolo.ai/v1"
+        self.api_key = api_key
+        self.memory_adapter = RegoloMemoryAdapter()
+        self._set_client()
+
+    def _set_client(self):
+        if not self.client:
+            self.client = OpenAI(
+                api_key=self.api_key, base_url=self.base_url
+            )
+
+    def _set_a_client(self):
+        if not self.a_client:
+            self.a_client = AsyncOpenAI(
+                api_key=self.api_key, base_url=self.base_url
+            )
+
+    def _response_to_client_response(
+        self, response, tool_map: dict[str, Tool] | None
+    ) -> ClientResponse:
+        blocks = []
+        for choice in response.choices:
+            if choice.message.content:
+                blocks.append(TextBlock(content=choice.message.content))
+
+            if choice.message.tool_calls and tool_map:
+                for tool_call in choice.message.tool_calls:
+                    tool = tool_map.get(tool_call.function.name)
+
+                    if not tool:
+                        raise ValueError(
+                            f"Tool {tool_call.function.name} not found"
+                        )
+
+                    blocks.append(
+                        FunctionCallBlock(
+                            id=tool_call.id,
+                            name=tool_call.function.name,
+                            arguments=json.loads(
+                                tool_call.function.arguments
+                            ),
+                            tool=tool,
+                        )
+                    )
+
+            # Handle media content if present
+            if hasattr(choice.message, "media") and choice.message.media:
+                for media_item in choice.message.media:
+                    media = Media(
+                        media_type=media_item.type,
+                        source_type=(
+                            "url" if media_item.source_url else "base64"
+                        ),
+                        source=(
+                            media_item.source_url or media_item.data
+                        ),
+                        detail=getattr(media_item, "detail", "high"),
+                    )
+                    blocks.append(MediaBlock(media=media))
+
+        return ClientResponse(
+            content=blocks,
+            stop_reason=response.choices[0].finish_reason,
+            prompt_tokens_used=response.usage.prompt_tokens,
+            completion_tokens_used=response.usage.completion_tokens,
+            cached_tokens_used=(
+                response.usage.prompt_tokens_details.cached_tokens
+                if response.usage.prompt_tokens_details
+                else 0
+            ),
+        )
+
+    def _convert_tools(self, tools: Tool) -> dict:
+        """Convert tools to Regolo format (OpenAI function format)."""
+        tool_schema = ToolConverter.to_openai_format(tools)
+        # OpenAI API expects nested structure with 'function' key
+        # Remove 'type' from tool_schema and nest remaining fields
+        function_def = {
+            "name": tool_schema["name"],
+            "description": tool_schema["description"],
+            "parameters": tool_schema["parameters"],
+        }
+        return {"type": "function", "function": function_def}
+
+    def _convert_tool_choice(
+        self,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+    ) -> dict | Literal["auto", "required", "none"]:
+        if isinstance(tool_choice, list) and len(tool_choice) > 1:
+            raise NotImplementedError(
+                "multiple function names is not supported by OpenAI"
+            )
+        elif isinstance(tool_choice, list):
+            return {
+                "type": "function",
+                "function": {"name": tool_choice[0]},
+            }
+        else:
+            return tool_choice
+
+    def _invoke(
+        self,
+        *,
+        input: str,
+        tools: list[Tool] | None,
+        memory: Memory | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        temperature: float | None,
+        max_tokens: int,
+        system_prompt: str | None,
+        **kwargs,
+    ) -> ClientResponse:
+        if tools is None:
+            tools = []
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        tool_map = {tool.name: tool for tool in tools}
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": False,
+            "max_completion_tokens": max_tokens,
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+
+        client: OpenAI = self._get_client()
+        response = client.chat.completions.create(**kwargs)
+        return self._response_to_client_response(response, tool_map)
+
+    async def _a_invoke(
+        self,
+        *,
+        input: str,
+        tools: list[Tool] | None,
+        memory: Memory | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        temperature: float | None,
+        max_tokens: int,
+        system_prompt: str | None,
+        **kwargs,
+    ) -> ClientResponse:
+        if tools is None:
+            tools = []
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        tool_map = {tool.name: tool for tool in tools}
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": False,
+            "max_completion_tokens": max_tokens,
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+
+        a_client = self._get_a_client()
+        response = await a_client.chat.completions.create(**kwargs)
+        return self._response_to_client_response(response, tool_map)
+
+    def _stream_invoke(
+        self,
+        input: str,
+        tools: list[Tool] | None,
+        memory: Memory | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        temperature: float | None,
+        max_tokens: int,
+        system_prompt: str | None,
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        messages = self._memory_to_contents(system_prompt, input, memory)
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": True,
+            "max_completion_tokens": max_tokens,
+            "stream_options": {"include_usage": True},
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+
+        response = self.client.chat.completions.create(**kwargs)
+        message_content = ""
+        for chunk in response:
+            delta = None
+            finish_reason = None
+
+            if len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+            delta_content = delta.content if delta and delta.content else ""
+            message_content = message_content + delta_content
+            yield ClientResponse(
+                content=[TextBlock(content=message_content)],
+                delta=delta_content,
+                stop_reason=finish_reason or None,
+                prompt_tokens_used=(
+                    chunk.usage.prompt_tokens
+                    if hasattr(chunk.usage, "prompt_tokens")
+                    else 0
+                ),
+                completion_tokens_used=(
+                    chunk.usage.completion_tokens
+                    if hasattr(chunk.usage, "completion_tokens")
+                    else 0
+                ),
+                cached_tokens_used=(
+                    chunk.usage.prompt_tokens_details.cached_tokens
+                    if hasattr(chunk.usage, "prompt_tokens_details")
+                    and chunk.usage.prompt_tokens_details
+                    else 0
+                ),
+            )
+
+    async def _a_stream_invoke(
+        self,
+        input: str,
+        tools: list[Tool] | None = None,
+        memory: Memory | None = None,
+        tool_choice: (
+            Literal["auto", "required", "none"] | list[str]
+        ) = "auto",
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        messages = self._memory_to_contents(system_prompt, input, memory)
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": True,
+            "max_completion_tokens": max_tokens,
+            "stream_options": {"include_usage": True},
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+
+        a_client = self._get_a_client()
+        message_content = ""
+
+        async for chunk in await a_client.chat.completions.create(**kwargs):
+            delta = None
+            finish_reason = None
+
+            if len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+            delta_content = delta.content if delta and delta.content else ""
+            message_content = message_content + delta_content
+
+            yield ClientResponse(
+                content=[TextBlock(content=message_content)],
+                delta=delta_content,
+                stop_reason=finish_reason or None,
+                prompt_tokens_used=(
+                    chunk.usage.prompt_tokens
+                    if hasattr(chunk.usage, "prompt_tokens")
+                    else 0
+                ),
+                completion_tokens_used=(
+                    chunk.usage.completion_tokens
+                    if hasattr(chunk.usage, "completion_tokens")
+                    else 0
+                ),
+                cached_tokens_used=(
+                    chunk.usage.prompt_tokens_details.cached_tokens
+                    if hasattr(chunk.usage, "prompt_tokens_details")
+                    and chunk.usage.prompt_tokens_details
+                    else 0
+                ),
+            )
+
+    def _structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None,
+        temperature: float | None,
+        max_tokens: int,
+        system_prompt: str | None,
+        tools: list[Tool] | None,
+        tool_choice: (
+            Literal["auto", "required", "none"] | list[str]
+        ) = "auto",
+        **kwargs,
+    ) -> ClientResponse:
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "response_format": output_cls,
+            "max_completion_tokens": max_tokens,
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+            # Structured response needs strict mode
+            for tool in kwargs["tools"]:
+                tool["function"]["strict"] = True
+                tool["function"]["parameters"]["additionalProperties"] = False
+
+        response = self.client.beta.chat.completions.parse(**kwargs)
+
+        stop_reason = response.choices[0].finish_reason
+
+        if not response.choices[0].message.content:
+            raise ValueError("No content in response")
+
+        if hasattr(output_cls, "model_validate_json"):
+            structured_data = output_cls.model_validate_json(
+                response.choices[0].message.content
+            )
+        else:
+            structured_data = json.loads(
+                response.choices[0].message.content
+            )
+        return ClientResponse(
+            content=[StructuredBlock(content=structured_data)],
+            stop_reason=stop_reason,
+            prompt_tokens_used=(
+                response.usage.prompt_tokens if response.usage else 0
+            ),
+            completion_tokens_used=(
+                response.usage.completion_tokens if response.usage else 0
+            ),
+            cached_tokens_used=(
+                response.usage.prompt_tokens_details.cached_tokens
+                if response.usage
+                and hasattr(response.usage, "prompt_tokens_details")
+                and response.usage.prompt_tokens_details
+                and hasattr(
+                    response.usage.prompt_tokens_details, "cached_tokens"
+                )
+                and response.usage.prompt_tokens_details.cached_tokens
+                is not None
+                else 0
+            ),
+        )
+
+    async def _a_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None,
+        temperature: float,
+        max_tokens: int,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: (
+            Literal["auto", "required", "none"] | list[str]
+        ) = "auto",
+        **kwargs,
+    ):
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "response_format": output_cls,
+            "max_completion_tokens": max_tokens,
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+            # Structured response needs strict mode
+            for tool in kwargs["tools"]:
+                tool["function"]["strict"] = True
+                tool["function"]["parameters"]["additionalProperties"] = False
+
+        a_client = self._get_a_client()
+        response = await a_client.beta.chat.completions.parse(**kwargs)
+
+        stop_reason = response.choices[0].finish_reason
+        if hasattr(output_cls, "model_validate_json"):
+            structured_data = output_cls.model_validate_json(
+                response.choices[0].message.content
+            )
+        else:
+            structured_data = json.loads(
+                response.choices[0].message.content
+            )
+        return ClientResponse(
+            content=[StructuredBlock(content=structured_data)],
+            stop_reason=stop_reason,
+            prompt_tokens_used=response.usage.prompt_tokens,
+            completion_tokens_used=response.usage.completion_tokens,
+            cached_tokens_used=(
+                response.usage.prompt_tokens_details.cached_tokens
+                if response.usage.prompt_tokens_details
+                else 0
+            ),
+        )
