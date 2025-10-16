@@ -59,11 +59,11 @@ with ContextTracing().trace("trace_name"):
     with tracer.start_as_current_span("database_query"):
         # Database operation
         data = fetch_from_database()
-    
+
     with tracer.start_as_current_span("data_validation"):
         # Validation logic
         validate_data(data)
-    
+
     with tracer.start_as_current_span("business_logic"):
         # Core business logic
         result = process_business_rules(data)

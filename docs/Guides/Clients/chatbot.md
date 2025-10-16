@@ -22,22 +22,22 @@ client = OpenAIClient(
 
 def simple_chatbot():
     """Basic chatbot with conversation memory."""
-    
+
     memory = Memory()
-    
+
     print("Chatbot: Hello! I'm here to help. Type 'quit' to exit.")
-    
+
     while True:
         user_input = input("\nYou: ")
-        
+
         if user_input.lower() in ['quit', 'exit', 'bye']:
             print("Chatbot: Goodbye!")
             break
-        
+
         # Get AI response with memory context
         response = client.invoke(user_input, memory=memory)
         print(f"Chatbot: {response.text}")
-        
+
         # Update conversation memory
         memory.add_turn(TextBlock(content=user_input), role=ROLE.USER)
         memory.add_turn(response.content, role=ROLE.ASSISTANT)

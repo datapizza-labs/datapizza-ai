@@ -23,10 +23,10 @@ Before getting started, you'll need to have Ollama installed and running on your
    ```bash
    # Pull the Gemma 2B model (lightweight option)
    ollama pull gemma2:2b
-   
+
    # Or pull Gemma 7B for better performance
    ollama pull gemma2:7b
-   
+
    # Or pull Llama 3.1 8B
    ollama pull llama3.1:8b
    ```
