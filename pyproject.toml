@@ -42,6 +42,7 @@ members = [
 
     # Clients
     "datapizza-ai-clients/datapizza-ai-clients-anthropic",
+    "datapizza-ai-clients/datapizza-ai-clients-bedrock",
     "datapizza-ai-clients/datapizza-ai-clients-google",
     "datapizza-ai-clients/datapizza-ai-clients-mistral",
     "datapizza-ai-clients/datapizza-ai-clients-openai",
