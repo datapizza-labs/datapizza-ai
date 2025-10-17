@@ -2,8 +2,7 @@ import pytest
 from pydantic import BaseModel
 
 from datapizza.clients.mock_client import MockClient
-from datapizza.core.clients.client import Client
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory.memory import Memory
 from datapizza.type import TextBlock
 from datapizza.type.type import ROLE

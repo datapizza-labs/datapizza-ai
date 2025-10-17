@@ -1,8 +1,8 @@
 import logging
 from typing import Literal
 
+from datapizza.core.clients import ClientResponse
 from datapizza.core.clients.client import Client
-from datapizza.core.clients.response import ClientResponse
 from datapizza.memory.memory import Memory, Turn
 from datapizza.memory.memory_adapter import MemoryAdapter
 from datapizza.tools.tools import Tool

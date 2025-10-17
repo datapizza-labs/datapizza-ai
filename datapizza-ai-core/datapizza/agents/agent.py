@@ -7,8 +7,7 @@ from typing import Any, Literal, Union, cast
 from pydantic import BaseModel
 
 from datapizza.agents.logger import AgentLogger
-from datapizza.core.clients import Client
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.tracing.tracing import agent_span, tool_span
