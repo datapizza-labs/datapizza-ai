@@ -24,6 +24,7 @@ dependencies = [
     "datapizza-ai-clients-openai>=0.0.1",
     "datapizza-ai-embedders-openai>=0.0.1",
     "datapizza-ai-vectorstores-qdrant>=0.0.1",
+    "datapizza-ai-vectorstores-milvus>=0.0.1",
 ]
 
 # Development dependencies
