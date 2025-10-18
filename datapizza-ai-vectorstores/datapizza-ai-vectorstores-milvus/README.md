@@ -28,6 +28,72 @@ Milvus server must be running locally or remotely.
 
 ## Installation
 
+Example of docker-compose.yml:
+```yml
+  etcd:
+    # coordinator
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - milvus-net
+
+  minio:
+    # for storage upload S3
+    image: minio/minio:RELEASE.2024-04-06T05-26-02Z
+    container_name: milvus-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./milvus/minio:/data
+    networks:
+      - milvus-net
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.5.16
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: minioadmin
+      MINIO_SECRET_ACCESS_KEY: minioadmin
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_NAME: milvus-bucket
+    command: ["milvus", "run", "standalone"]   # <--- aggiungi questo
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+    volumes:
+      - ./milvus/db:/var/lib/milvus
+    networks:
+      - milvus-net
+
+
+
+networks:
+  milvus-net:
+    driver: bridge
+```
+
+
 Docker execution:
 ```bash
 docker run -d --name milvus-standalone \
