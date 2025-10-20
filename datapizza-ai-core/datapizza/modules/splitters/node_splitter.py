@@ -21,7 +21,7 @@ class NodeSplitter(Splitter):
     def _node_to_chunks(self, nodes: list[Node]) -> list[Chunk]:
         return [
             Chunk(id=str(node.id), text=node.content, metadata=node.metadata)
-            for node in nodes
+            for node in nodes  #  if node.content
         ]
 
     def split(self, node: Node) -> list[Chunk]:
