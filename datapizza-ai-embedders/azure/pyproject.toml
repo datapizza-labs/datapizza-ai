@@ -1,0 +1,58 @@
+# Build system configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Project metadata
+[project]
+name = "datapizza-ai-embedders-azure"
+version = "0.0.1"
+description = "Azure OpenAI embedder for the datapizza-ai framework"
+readme = "README.md"
+license = {text = "MIT"}
+
+requires-python = ">=3.10.0,<4"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "datapizza-ai-core>=0.0.1",
+    "openai>=1.0.0,<2.0.0",
+]
+
+# Development dependencies
+[dependency-groups]
+dev = [
+    "deptry>=0.23.0",
+    "pytest",
+    "pytest-asyncio",
+    "ruff>=0.11.5",
+]
+
+# Hatch build configuration
+[tool.hatch.build.targets.sdist]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
+
+[tool.hatch.build.targets.wheel]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
+
+# Ruff configuration
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "I",   # isort
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # Ruff-specific rules
+    "C4",  # flake8-comprehensions
+]
