@@ -22,6 +22,7 @@ class NodeSplitter(Splitter):
         return [
             Chunk(id=str(node.id), text=node.content, metadata=node.metadata)
             for node in nodes
+            if node.content
         ]
 
     def split(self, node: Node) -> list[Chunk]:
