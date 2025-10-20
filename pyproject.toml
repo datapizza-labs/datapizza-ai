@@ -69,7 +69,9 @@ members = [
     # Tools
     "datapizza-ai-tools/duckduckgo",
     "datapizza-ai-tools/sqldatabase",
-    "datapizza-ai-tools/filesystem"
+    "datapizza-ai-tools/filesystem",
+    "datapizza-ai-tools/web-fetch",
+
 ]
 
 [tool.uv.sources]
