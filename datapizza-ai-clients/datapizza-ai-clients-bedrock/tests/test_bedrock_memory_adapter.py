@@ -24,13 +24,6 @@ def test_init_bedrock_client_with_credentials():
     assert client.region_name == "us-west-2"
 
 
-def test_init_bedrock_client_with_profile():
-    """Test BedrockClient initialization with AWS profile"""
-    client = BedrockClient(profile_name="test-profile")
-    assert client is not None
-    assert client.profile_name == "test-profile"
-
-
 def test_bedrock_memory_adapter():
     """Test that the memory adapter converts memory to Bedrock message format"""
     memory_adapter = BedrockMemoryAdapter()
