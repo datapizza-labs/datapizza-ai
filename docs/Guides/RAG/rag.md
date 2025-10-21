@@ -132,6 +132,7 @@ The DagPipeline enables complex retrieval workflows with query rewriting, embedd
 
 ```python
 from datapizza.clients.openai import OpenAIClient
+from datapizza.core.vectorstore import VectorConfig
 from datapizza.embedders.openai import OpenAIEmbedder
 from datapizza.modules.prompt import ChatPromptTemplate
 from datapizza.modules.rewriters import ToolRewriter
