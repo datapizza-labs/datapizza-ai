@@ -1,4 +1,3 @@
-import json
 import os
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
@@ -9,7 +8,7 @@ from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.type import FunctionCallBlock, TextBlock, ThoughtBlock
+from datapizza.type import FunctionCallBlock, TextBlock
 
 from .memory_adapter import BedrockMemoryAdapter
 
@@ -255,18 +254,7 @@ class BedrockClient(Client):
 
         Note: For true async support, consider using aioboto3
         """
-        # For now, we'll use the sync implementation
-        # To add true async support, install aioboto3 and modify _set_a_client
-        return self._invoke(
-            input=input,
-            tools=tools,
-            memory=memory,
-            tool_choice=tool_choice,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            system_prompt=system_prompt,
-            **kwargs,
-        )
+        raise NotImplementedError("Async support for Bedrock is not yet implemented")
 
     def _stream_invoke(
         self,
@@ -305,13 +293,10 @@ class BedrockClient(Client):
             request_body["system"] = [{"text": system_prompt}]
 
         if tools:
-            tool_map = {tool.name: tool for tool in tools}
             request_body["toolConfig"] = {
                 "tools": self._convert_tools(tools),
                 "toolChoice": self._convert_tool_choice(tool_choice),
             }
-        else:
-            tool_map = {}
 
         request_body.update(kwargs)
 
@@ -372,18 +357,7 @@ class BedrockClient(Client):
         **kwargs,
     ) -> AsyncIterator[ClientResponse]:
         """Async streaming - currently wraps sync implementation"""
-        # For true async support, use aioboto3
-        for chunk in self._stream_invoke(
-            input=input,
-            tools=tools,
-            memory=memory,
-            tool_choice=tool_choice,
-            temperature=temperature,
-            max_tokens=max_tokens or 2048,
-            system_prompt=system_prompt,
-            **kwargs,
-        ):
-            yield chunk
+        raise NotImplementedError("Async support for Bedrock is not yet implemented")
 
     def _structured_response(
         self,
