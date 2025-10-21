@@ -137,6 +137,7 @@ from datapizza.modules.prompt import ChatPromptTemplate
 from datapizza.modules.rewriters import ToolRewriter
 from datapizza.pipeline import DagPipeline
 from datapizza.vectorstores.qdrant import QdrantVectorstore
+from datapizza.core.vectorstore import VectorConfig
 
 openai_client = OpenAIClient(
     model="gpt-4o-mini",
