@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-embedders-openai"
-version = "0.0.3"
+version = "0.0.4"
 description = "OpenAI embedder for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -19,7 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.0.1",
-    "openai>=1.0.0,<2.0.0",
+    "openai>=2.0.0,<3.0.0",
 ]
 
 # Development dependencies
