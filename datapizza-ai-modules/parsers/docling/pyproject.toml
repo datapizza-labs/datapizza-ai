@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-parsers-docling"
-version = "0.0.4"
+version = "0.0.5"
 description = "Doclign parser for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1",
+    "datapizza-ai-core>=0.0.1,<0.1.0",
     "docling>=2.53.0",
     "easyocr>=1.7.0"
 ]

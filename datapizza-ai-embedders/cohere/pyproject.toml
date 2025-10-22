@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-embedders-cohere"
-version = "0.0.2"
+version = "0.0.3"
 description = "Cohere embedder for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0",
+    "datapizza-ai-core>=0.0.0,<0.1.0",
     "cohere>=5.14.0,<6.0.0",
 ]
 

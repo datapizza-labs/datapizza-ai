@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-rerankers-together"
-version = "0.0.2"
+version = "0.0.3"
 description = "Together AI reranker for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0",
+    "datapizza-ai-core>=0.0.0,<0.1.0",
     "together>=1.5.4,<2.0.0",
 ]
 
