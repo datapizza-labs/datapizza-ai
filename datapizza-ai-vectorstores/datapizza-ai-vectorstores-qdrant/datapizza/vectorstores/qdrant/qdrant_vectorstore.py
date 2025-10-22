@@ -201,7 +201,7 @@ class QdrantVectorstore(Vectorstore):
     def search(
         self,
         collection_name: str,
-        query_vector: list[float],
+        query_vector: list[float] | SparseEmbedding | dict,
         k: int = 10,
         vector_name: str | None = None,
         **kwargs,
@@ -221,7 +221,27 @@ class QdrantVectorstore(Vectorstore):
         """
         client = self.get_client()
 
-        qry = (vector_name, query_vector) if vector_name else query_vector
+        if isinstance(query_vector, list) and all(
+            isinstance(v, float) for v in query_vector
+        ):
+            qry = (vector_name, query_vector) if vector_name else query_vector
+        elif isinstance(query_vector, dict):
+            indices = query_vector.get("indices", [])
+            values = query_vector.get("values", [])
+            qry = models.NamedSparseVector(
+                name=vector_name or "default",
+                vector=models.SparseVector(indices=indices, values=values),
+            )
+
+        elif isinstance(query_vector, SparseEmbedding):
+            qry = models.NamedSparseVector(
+                name=query_vector.name,
+                vector=models.SparseVector(
+                    indices=query_vector.indices, values=query_vector.values
+                ),
+            )
+        else:
+            raise ValueError(f"Unsupported query vector type: {type(query_vector)}")
 
         hits = client.search(
             collection_name=collection_name,
