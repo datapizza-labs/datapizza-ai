@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-tools-filesystem"
-version = "0.0.1"
+version = "0.0.2"
 description = "A tool for interacting with the local file system."
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1",
+    "datapizza-ai-core>=0.0.1,<0.1.0",
 ]
 
 # Development dependencies
