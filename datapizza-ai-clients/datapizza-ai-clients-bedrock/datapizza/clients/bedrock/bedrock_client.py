@@ -6,6 +6,7 @@ import boto3
 from botocore.config import Config
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import FunctionCallBlock, TextBlock
@@ -178,9 +179,11 @@ class BedrockClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=prompt_tokens,
-            completion_tokens_used=completion_tokens,
-            cached_tokens_used=0,  # Bedrock doesn't expose cache metrics in the same way
+            usage=TokenUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cached_tokens=0,  # Bedrock doesn't expose cache metrics in the same way
+            ),
         )
 
     def _invoke(
@@ -340,9 +343,11 @@ class BedrockClient(Client):
             content=[TextBlock(content=message_text)],
             delta="",
             stop_reason=stop_reason,
-            prompt_tokens_used=input_tokens,
-            completion_tokens_used=output_tokens,
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                cached_tokens=0,
+            ),
         )
 
     async def _a_stream_invoke(

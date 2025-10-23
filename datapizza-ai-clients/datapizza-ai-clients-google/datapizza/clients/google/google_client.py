@@ -3,6 +3,7 @@ from typing import Literal
 
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
@@ -265,11 +266,18 @@ class GoogleClient(Client):
         message_text = ""
         thought_block = ThoughtBlock(content="")
 
+        usage = TokenUsage()
+
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
             contents=contents,  # type: ignore
             config=config,
         ):
+            usage += TokenUsage(
+                prompt_tokens=chunk.usage_metadata.prompt_token_count or 0,
+                completion_tokens=chunk.usage_metadata.candidates_token_count or 0,
+                cached_tokens=chunk.usage_metadata.cached_content_token_count or 0,
+            )
             if not chunk.candidates:
                 raise ValueError("No candidates in response")
 
@@ -288,24 +296,7 @@ class GoogleClient(Client):
                     content=[],
                     delta=chunk.text or "",
                     stop_reason=stop_reason,
-                    prompt_tokens_used=(
-                        chunk.usage_metadata.prompt_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.prompt_token_count
-                        else 0
-                    ),
-                    completion_tokens_used=(
-                        chunk.usage_metadata.candidates_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.candidates_token_count
-                        else 0
-                    ),
-                    cached_tokens_used=(
-                        chunk.usage_metadata.cached_content_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.cached_content_token_count
-                        else 0
-                    ),
+                    usage=usage,
                 )
                 continue
 
@@ -322,25 +313,12 @@ class GoogleClient(Client):
                             content=[],
                             delta=chunk.text or "",
                             stop_reason=stop_reason,
-                            prompt_tokens_used=(
-                                chunk.usage_metadata.prompt_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.prompt_token_count
-                                else 0
-                            ),
-                            completion_tokens_used=(
-                                chunk.usage_metadata.candidates_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.candidates_token_count
-                                else 0
-                            ),
-                            cached_tokens_used=(
-                                chunk.usage_metadata.cached_content_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.cached_content_token_count
-                                else 0
-                            ),
                         )
+        yield ClientResponse(
+            content=[TextBlock(content=message_text)],
+            stop_reason=stop_reason,
+            usage=usage,
+        )
 
     async def _a_stream_invoke(
         self,

@@ -26,7 +26,6 @@ class TokenUsage(BaseModel):
         )
 
 
-
 class ClientResponse:
     """
     A class for storing the response from a client.
@@ -43,6 +42,7 @@ class ClientResponse:
 
     def __init__(
         self,
+        *,
         content: list[Block],
         delta: str | None = None,
         stop_reason: str | None = None,
@@ -90,9 +90,11 @@ class ClientResponse:
     @property
     def completion_tokens_used(self) -> int:
         return self.usage.completion_tokens
+
     @property
     def cached_tokens_used(self) -> int:
         return self.usage.cached_tokens
+
     @property
     def thinking_tokens_used(self) -> int:
         return self.usage.thinking_tokens
