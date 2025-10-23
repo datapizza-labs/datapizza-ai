@@ -70,7 +70,7 @@ members = [
     "datapizza-ai-tools/duckduckgo",
     "datapizza-ai-tools/sqldatabase",
     "datapizza-ai-tools/filesystem",
-    "datapizza-ai-tools/web-fetch",
+    "datapizza-ai-tools/web_fetch",
 
 ]
 
@@ -107,6 +107,7 @@ datapizza-ai-cache-redis = {workspace = true}
 datapizza-ai-tools-duckduckgo = {workspace = true}
 datapizza-ai-tools-filesystem = {workspace = true}
 datapizza-ai-tools-sqldatabase = {workspace = true}
+datapizza-ai-tools-web-fetch = {workspace = true}
 
 
 # Hatch build configuration
