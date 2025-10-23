@@ -2,8 +2,6 @@ import logging
 from collections.abc import Generator
 from typing import Any
 
-from qdrant_client import AsyncQdrantClient, QdrantClient, models
-
 from datapizza.core.vectorstore import VectorConfig, Vectorstore
 from datapizza.type import (
     Chunk,
@@ -12,6 +10,7 @@ from datapizza.type import (
     EmbeddingFormat,
     SparseEmbedding,
 )
+from qdrant_client import AsyncQdrantClient, QdrantClient, models
 
 log = logging.getLogger(__name__)
 

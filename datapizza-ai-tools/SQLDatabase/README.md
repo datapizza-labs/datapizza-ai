@@ -16,7 +16,7 @@ This tool provides a robust and easy-to-use interface for connecting `datapizza-
 Agents equipped with this tool can inspect database schemas, list tables, and execute SQL queries to answer questions based on structured data.
 
 > **⚠️ Warning: Risk of Data Modification**
-> 
+>
 > Using queries like `INSERT`, `UPDATE`, and `DELETE` will permanently modify the data in your database. Exercise extreme caution. Before performing write operations in a production environment, consider the following:
 > - Test queries in a development or staging environment.
 > - Use a "query-writing" agent to generate and validate the SQL before execution.
@@ -43,17 +43,17 @@ pip install datapizza-ai-tools-sqldatabase
 ```
 
 > **Note on Database Drivers:**
-> 
+>
 > This tool uses SQLAlchemy, which requires specific DB-API drivers to connect to different databases. For example, if you want to connect to PostgreSQL or MySQL, you'll need to install their respective drivers:
-> 
+>
 > ```bash
 > # For PostgreSQL
 > pip install psycopg2-binary
-> 
+>
 > # For MySQL
 > pip install mysql-connector-python
 > ```
-> 
+>
 > Please refer to the [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/dialects/) for a full list of supported databases and their required drivers.
 
 ### 2. Example: Creating a Database Expert Agent

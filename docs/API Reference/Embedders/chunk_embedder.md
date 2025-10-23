@@ -76,4 +76,3 @@ for i, chunk in enumerate(embedded_chunks):
         print(f"  Embedding name: {chunk.embeddings[0].name}")
         print(f"  Vector size: {len(chunk.embeddings[0].vector)}")
 ```
-

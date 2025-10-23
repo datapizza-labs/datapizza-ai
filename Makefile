@@ -12,7 +12,7 @@ linter-check:
 	uvx ruff check .
 
 linter-fix:
-	uvx ruff check --fix 
+	uvx ruff check --fix
 
 linter-force-fix:
 	uvx ruff check --fix --unsafe-fixes
@@ -23,4 +23,3 @@ dependency-check:
 run_docs:
 	uv pip install mkdocs-material  pymdown-extensions mkdocs-awesome-pages-plugin mkdocstrings-python
 	uv run mkdocs serve --livereload
-

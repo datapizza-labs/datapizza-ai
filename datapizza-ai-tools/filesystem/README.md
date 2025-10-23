@@ -99,7 +99,7 @@ Follow these steps:
 5.  Use `delete_file` or `delete_directory` to remove items.
 6.  Use `move_item` to rename or move files/directories.
 7.  Use `copy_file` to duplicate files.
-8.  Use `replace_in_file` to modify file content. 
+8.  Use `replace_in_file` to modify file content.
 
 """,
     tools=[

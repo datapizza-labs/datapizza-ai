@@ -5,7 +5,13 @@ from google.genai import types
 
 
 class GoogleEmbedder(BaseEmbedder):
-    def __init__(self, *, api_key: str, model_name: str | None = None, task_type: str = "RETRIEVAL_DOCUMENT"):
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model_name: str | None = None,
+        task_type: str = "RETRIEVAL_DOCUMENT",
+    ):
         self.api_key = api_key
         self.model_name = model_name
         self.task_type = task_type
@@ -37,7 +43,7 @@ class GoogleEmbedder(BaseEmbedder):
         result = client.models.embed_content(
             model=model,
             contents=texts,
-            config=types.EmbedContentConfig(task_type=self.task_type)
+            config=types.EmbedContentConfig(task_type=self.task_type),
         )
 
         res = [embedding.values for embedding in result.embeddings]
@@ -55,7 +61,11 @@ class GoogleEmbedder(BaseEmbedder):
 
         client = self._get_a_client()
 
-        result = await client.models.embed_content_async(model=model, contents=texts, config=types.EmbedContentConfig(task_type=self.task_type))
+        result = await client.models.embed_content_async(
+            model=model,
+            contents=texts,
+            config=types.EmbedContentConfig(task_type=self.task_type),
+        )
 
         res = [embedding.values for embedding in result.embeddings]
 

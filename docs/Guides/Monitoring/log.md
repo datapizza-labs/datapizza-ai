@@ -14,4 +14,3 @@ The default values are:
 
 - `DATAPIZZA_LOG_LEVEL=INFO`
 - `DATAPIZZA_AGENT_LOG_LEVEL=INFO`
-

@@ -1,6 +1,6 @@
 # datapizza-ai
 
-**Build reliable Gen AI solutions without overhead** 
+**Build reliable Gen AI solutions without overhead**
 
 `datapizza-ai` provides clear interfaces and predictable behavior for agents and RAG. End-to-end visibility and reliable orchestration keep engineers in control from PoC to scale
 
@@ -41,4 +41,3 @@ agent = Agent(name="assistant", client=client, tools = [get_weather])
 response = agent.run("What is the weather in Rome?")
 # output: The weather in Rome is sunny
 ```
-

@@ -137,4 +137,3 @@ IngestionPipeline support async run
 ```python
 await pipeline.a_run(file_path=f, metadata={"name": f, "type": "md"})
 ```
-

@@ -583,9 +583,9 @@ save_results(
 )
 ```
 For clarity in the `process_data_item` returned chunks:
-The `ChunkTransformer` sets `chunk.text` to the stringified version.   
-If `reranker_results` are these transformed `Chunk` objects, then `chunk.text` will be the transformed string.   
-The metadata like `document_name` is preserved.   
+The `ChunkTransformer` sets `chunk.text` to the stringified version.
+If `reranker_results` are these transformed `Chunk` objects, then `chunk.text` will be the transformed string.
+The metadata like `document_name` is preserved.
 The original text before transformation is in `chunk.metadata.get("text")` which is used in the eval.
 
 ## 4. Evaluation using `datapizza-ai` metrics
@@ -793,7 +793,7 @@ def calculate_similarity_based_metrics(
         except Exception as e:
             logging.error(f"Error calculating f1_at_{k_val}_similarity: {e}")
             metrics_dict[f"f1_at_{k_val}_similarity"] = None
-            
+
     try:
         metrics_dict["hybrid_log_rank_score_similarity"] = (
             metrics.hybrid_log_rank_score_similarity(
@@ -934,7 +934,7 @@ for i, item in enumerate(results_list):
     retrieved_chunk_embeddings_for_item = [
         retrieved_chunks_emb_dict.get(text) for text in retrieved_chunk_texts_for_item if retrieved_chunks_emb_dict.get(text) is not None
     ]
-    
+
     # Ground truth texts (facts) for retrieval
     ground_truth_texts_for_item = []
     if item.get("gt_chunks") and isinstance(item["gt_chunks"], list):
@@ -964,7 +964,7 @@ for i, item in enumerate(results_list):
         similarity_threshold=0.6
     )
     current_metrics.update(similarity_metrics)
-    
+
     # Store data for batch generation metric calculation
     queries_for_gen_eval.append(item.get("query", ""))
     ground_truth_answers_for_gen_eval.append(item.get("answer", ""))
@@ -1120,7 +1120,7 @@ def visualize_results(all_item_metrics: list[dict], k_values: list[int]):
 {df_results.head(5).to_string()}")
     except Exception as e:
         logging.error(f"Error logging.infoing detailed results head: {e}")
-    
+
     output_csv_path = "./data/results/evaluation_metrics_detailed.csv" # From script
     # Example of saving (ensure directory exists):
     # output_dir = os.path.dirname(output_csv_path)

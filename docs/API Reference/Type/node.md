@@ -10,5 +10,3 @@
 ::: datapizza.type.MediaNode
     options:
         show_source: false
-
-

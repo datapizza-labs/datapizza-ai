@@ -177,5 +177,3 @@ response = client.invoke(
 
 print(response.text)
 ```
-
-

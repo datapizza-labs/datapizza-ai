@@ -60,4 +60,3 @@ for i, chunk in enumerate(chunks):
     print(f"  Content preview: {chunk.text[:80]}...")
     print("---")
 ```
-

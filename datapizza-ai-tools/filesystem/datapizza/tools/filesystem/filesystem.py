@@ -1,4 +1,5 @@
 import os
+
 from datapizza.tools import tool
 
 
@@ -38,7 +39,7 @@ class FileSystem:
         :param file_path: The path of the file to read.
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 return f.read()
         except FileNotFoundError:
             return f"Error: File '{file_path}' not found."
@@ -97,6 +98,7 @@ class FileSystem:
                 return f"Error: Directory '{path}' not found."
             if recursive:
                 import shutil
+
                 shutil.rmtree(path)
             else:
                 os.rmdir(path)
@@ -130,6 +132,7 @@ class FileSystem:
         """
         try:
             import shutil
+
             shutil.copy2(source_path, destination_path)
             return f"Successfully copied '{source_path}' to '{destination_path}'."
         except FileNotFoundError:
@@ -149,14 +152,14 @@ class FileSystem:
         :param new_string: The new block of text to insert.
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             occurrences = content.count(old_string)
 
             if occurrences == 0:
                 return f"Error: The specified 'old_string' was not found in the file '{file_path}'. No changes were made."
-            
+
             if occurrences > 1:
                 return f"Error: {occurrences} occurrences found in '{file_path}'. Replacement requires a unique match."
 

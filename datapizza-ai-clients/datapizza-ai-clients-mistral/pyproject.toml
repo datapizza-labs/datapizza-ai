@@ -6,21 +6,21 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-mistral"
-version = "0.0.2"
+version = "0.0.4"
 description = "Mistral AI client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "Datapizza", email = "datapizza@datapizza.tech"}
 ]
-requires-python = ">=3.10.0,<4" 
+requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0",
+    "datapizza-ai-core>=0.0.5,<0.1.0",
     "mistralai>=1.2.0,<2.0.0",
     "requests>=2.25.0,<3.0.0",
 ]
