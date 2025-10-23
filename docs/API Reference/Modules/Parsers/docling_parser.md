@@ -8,7 +8,7 @@ A document parser that uses Docling to convert PDF files into structured hierarc
 pip install datapizza-ai-parsers-docling
 ```
 
-<!-- 
+<!--
 ::: datapizza.modules.parsers.docling.DoclingParser
     options:
         show_source: false

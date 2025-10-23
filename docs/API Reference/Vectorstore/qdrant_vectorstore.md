@@ -102,4 +102,3 @@ for chunk in results:
     print(f"Text: {chunk.text}")
     print(f"Metadata: {chunk.metadata}")
 ```
-

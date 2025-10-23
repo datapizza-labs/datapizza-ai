@@ -46,7 +46,9 @@ class OpenAIEmbedder(BaseEmbedder):
         embeddings = [embedding.embedding for embedding in response.data]
         return embeddings[0] if isinstance(text, str) else embeddings
 
-    async def a_embed(self, text: str | list[str], model_name: str | None = None) -> list[float]:
+    async def a_embed(
+        self, text: str | list[str], model_name: str | None = None
+    ) -> list[float]:
         model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")

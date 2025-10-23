@@ -11,7 +11,7 @@ class CohereReranker(Reranker):
         endpoint: str,
         top_n: int = 10,
         threshold: float | None = None,
-        model: str  = "model",
+        model: str = "model",
     ):
         """
         Args:

@@ -25,20 +25,40 @@ class FastEmbedder(BaseEmbedder):
             model_name=model_name, cache_dir=cache_dir
         )
 
-    def embed(self, text: str | list[str]) :
+    def embed(self, text: str | list[str]):
         if isinstance(text, list):
             embeddings = [next(iter(self.embedder.embed(t))) for t in text]
-            return [SparseEmbedding(name=self.embedding_name, values=embedding.values.tolist(), indices=embedding.indices.tolist()) for embedding in embeddings]
+            return [
+                SparseEmbedding(
+                    name=self.embedding_name,
+                    values=embedding.values.tolist(),
+                    indices=embedding.indices.tolist(),
+                )
+                for embedding in embeddings
+            ]
         else:
             embedding = next(iter(self.embedder.embed(text)))
-            return SparseEmbedding(name=self.embedding_name, values=embedding.values.tolist(), indices=embedding.indices.tolist())
-
+            return SparseEmbedding(
+                name=self.embedding_name,
+                values=embedding.values.tolist(),
+                indices=embedding.indices.tolist(),
+            )
 
     def a_embed(self, text: str | list[str]):
         if isinstance(text, list):
             embeddings = [next(iter(self.embedder.embed(t))) for t in text]
-            return [SparseEmbedding(name=self.embedding_name, values=embedding.values.tolist(), indices=embedding.indices.tolist()) for embedding in embeddings]
+            return [
+                SparseEmbedding(
+                    name=self.embedding_name,
+                    values=embedding.values.tolist(),
+                    indices=embedding.indices.tolist(),
+                )
+                for embedding in embeddings
+            ]
         else:
             embedding = next(iter(self.embedder.embed(text)))
-            return SparseEmbedding(name=self.embedding_name, values=embedding.values.tolist(), indices=embedding.indices.tolist())
-
+            return SparseEmbedding(
+                name=self.embedding_name,
+                values=embedding.values.tolist(),
+                indices=embedding.indices.tolist(),
+            )

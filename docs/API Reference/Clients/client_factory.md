@@ -50,6 +50,6 @@ print(response.content)
 ## Supported Providers
 
 - `openai` - OpenAI GPT models
-- `google` - Google Gemini models  
+- `google` - Google Gemini models
 - `anthropic` - Anthropic Claude models
 - `mistral` - Mistral AI models

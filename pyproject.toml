@@ -11,7 +11,7 @@ description = "Build reliable Gen AI solutions without overhead"
 readme = "README.md"
 license = {text = "MIT"}
 
-requires-python = ">=3.10.0,<4" 
+requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -39,36 +39,39 @@ dev = [
 members = [
     # Core
     "datapizza-ai-core",
-    
+
     # Clients
     "datapizza-ai-clients/datapizza-ai-clients-anthropic",
+    "datapizza-ai-clients/datapizza-ai-clients-bedrock",
     "datapizza-ai-clients/datapizza-ai-clients-google",
     "datapizza-ai-clients/datapizza-ai-clients-mistral",
     "datapizza-ai-clients/datapizza-ai-clients-openai",
     "datapizza-ai-clients/datapizza-ai-clients-openai-like",
-    
+
     # Embedders
     "datapizza-ai-embedders/cohere",
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
     "datapizza-ai-embedders/openai",
-    
+
     # Modules
     "datapizza-ai-modules/parsers/azure",
     #"datapizza-ai-modules/parsers/docling",
     "datapizza-ai-modules/rerankers/cohere",
     "datapizza-ai-modules/rerankers/together",
-    
+
     # Vectorstores
     "datapizza-ai-vectorstores/datapizza-ai-vectorstores-qdrant",
-    
+
     # Cache
     "datapizza-ai-cache/redis",
 
     # Tools
     "datapizza-ai-tools/duckduckgo",
     "datapizza-ai-tools/sqldatabase",
-    "datapizza-ai-tools/filesystem"
+    "datapizza-ai-tools/filesystem",
+    "datapizza-ai-tools/web-fetch",
+
 ]
 
 [tool.uv.sources]
@@ -131,4 +134,3 @@ select = [
     "RUF", # Ruff-specific rules
     "C4",  # flake8-comprehensions
 ]
-

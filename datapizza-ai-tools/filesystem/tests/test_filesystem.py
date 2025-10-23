@@ -1,5 +1,5 @@
-import os
 import pytest
+
 from datapizza.tools.filesystem import FileSystem
 
 
@@ -28,7 +28,7 @@ def test_list_directory_empty(fs_tool, tmp_path):
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
     result = fs_tool.list_directory(str(empty_dir))
-    assert result == f"The directory '{str(empty_dir)}' is empty."
+    assert result == f"The directory '{empty_dir!s}' is empty."
 
 
 def test_list_directory_not_found(fs_tool):
@@ -62,7 +62,9 @@ def test_create_directory(fs_tool, tmp_path):
 
     # Test creating an already existing directory
     result_existing = fs_tool.create_directory(str(new_dir_path))
-    assert "Successfully created directory" in result_existing # Should still report success due to exist_ok=True
+    assert (
+        "Successfully created directory" in result_existing
+    )  # Should still report success due to exist_ok=True
     assert new_dir_path.is_dir()
 
 
@@ -120,7 +122,9 @@ def test_move_item(fs_tool, tmp_path):
     assert destination_dir.is_dir()
 
     # Test moving a non-existent source
-    result_non_existent = fs_tool.move_item(str(tmp_path / "non_existent_source"), str(tmp_path / "any_destination"))
+    result_non_existent = fs_tool.move_item(
+        str(tmp_path / "non_existent_source"), str(tmp_path / "any_destination")
+    )
     assert "not found" in result_non_existent
 
 
@@ -134,14 +138,19 @@ def test_copy_file(fs_tool, tmp_path):
     assert destination_file.read_text() == "original content"
 
     # Test copying a non-existent source file
-    result_non_existent = fs_tool.copy_file(str(tmp_path / "non_existent_source_copy.txt"), str(tmp_path / "any_destination_copy.txt"))
+    result_non_existent = fs_tool.copy_file(
+        str(tmp_path / "non_existent_source_copy.txt"),
+        str(tmp_path / "any_destination_copy.txt"),
+    )
     assert "not found" in result_non_existent
 
 
 def test_replace_in_file_success(fs_tool, tmp_path):
     file_path = tmp_path / "test_replace_success.txt"
     file_path.write_text("hello world\nthis is a unique line")
-    result = fs_tool.replace_in_file(str(file_path), "this is a unique line", "this is a replaced line")
+    result = fs_tool.replace_in_file(
+        str(file_path), "this is a unique line", "this is a replaced line"
+    )
     assert "Replacement successful in file" in result
     assert file_path.read_text() == "hello world\nthis is a replaced line"
 

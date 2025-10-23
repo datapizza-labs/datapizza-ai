@@ -1,4 +1,4 @@
-constants: 
+constants:
   PROMPT : "You are a helpful assistant that captions tables."
   PROMPT_TABLE : "You are a helpful assistant that captions tables."
   PROMPT_FIGURE : "You are a helpful assistant that captions figures."

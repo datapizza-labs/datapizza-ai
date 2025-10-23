@@ -108,7 +108,6 @@ class OpenAILikeClient(Client):
         """Convert tools to OpenAI function format"""
         return {"type": "function", "function": tools.schema}
 
-
     def _convert_tool_choice(
         self, tool_choice: Literal["auto", "required", "none"] | list[str]
     ) -> dict | Literal["auto", "required", "none"]:

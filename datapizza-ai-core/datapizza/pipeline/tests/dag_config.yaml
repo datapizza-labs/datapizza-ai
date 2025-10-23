@@ -22,7 +22,7 @@ dag_pipeline:
       module: datapizza.modules.rewriters
       params:
         client: openai_client
-        system_prompt: ${PROMPT} 
+        system_prompt: ${PROMPT}
     - name: embedder
       type: ClientEmbedder
       module: datapizza.embedders
@@ -33,6 +33,3 @@ dag_pipeline:
     - from: rewriter
       to: embedder
       target_key: input_data
-
-
-

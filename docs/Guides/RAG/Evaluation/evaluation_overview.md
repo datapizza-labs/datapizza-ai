@@ -235,7 +235,7 @@ PREDICTION:
             system_prompt=judge_system_prompt, # Pass the detailed system prompt
             # temperature=0.2 # Lower temperature for more deterministic judging
         )
-        
+
         # The structured_data will be a list of Pydantic model instances.
         matching_data = client_response.structure_data[0] # Accessing the Pydantic model instance
         item["is_matching"] = matching_data.is_matching
@@ -338,4 +338,4 @@ While manually curated "golden" datasets are the ideal, they can be time-consumi
 *   **Control for Complexity and Style**: Use prompts to guide the LLM on the desired complexity, type (e.g., factual, comparison, summary), and style of the generated queries and answers.
 *   **Filter and Validate**: Implement post-processing steps to filter out low-quality or irrelevant synthetic data. This could involve heuristics, similarity checks against existing data, or even using another LLM as a preliminary judge.
 
-Building a (semi)synthetic dataset is a powerful technique, but it requires careful planning, execution, and ongoing human oversight to ensure it genuinely contributes to improving your RAG system. 
+Building a (semi)synthetic dataset is a powerful technique, but it requires careful planning, execution, and ongoing human oversight to ensure it genuinely contributes to improving your RAG system.

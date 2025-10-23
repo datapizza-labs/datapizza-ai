@@ -23,7 +23,7 @@ def test_list_tables(db_tool: SQLDatabase):
     """Tests that list_tables returns the correct table names."""
     tables = db_tool.list_tables()
     assert isinstance(tables, str)
-    assert "users" in tables.split('\n')
+    assert "users" in tables.split("\n")
 
 
 def test_get_table_schema(db_tool: SQLDatabase):
@@ -39,12 +39,13 @@ def test_get_table_schema(db_tool: SQLDatabase):
 def test_run_select_query(db_tool: SQLDatabase):
     """Tests that run executes a SELECT query and returns correct data."""
     result = db_tool.run_sql_query("SELECT name, age FROM users WHERE id = 1;")
-    
+
     data = json.loads(result)
-    
+
     assert isinstance(data, list)
     assert len(data) == 1
     assert data[0] == {"name": "Alice", "age": 30}
+
 
 def test_run_insert_query(db_tool: SQLDatabase):
     """Tests that run executes an INSERT statement and data is added."""
@@ -56,6 +57,7 @@ def test_run_insert_query(db_tool: SQLDatabase):
     data = json.loads(select_result)
     assert len(data) == 1
     assert data[0]["name"] == "Charlie"
+
 
 def test_run_query_error(db_tool: SQLDatabase):
     """Tests that a malformed query returns an error message."""

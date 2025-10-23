@@ -119,4 +119,3 @@ Work with strongly-typed outputs using JSON schemas and Pydantic models.
 
 ### 🤖 [Chatbot Guide](chatbot.md)
 Create sophisticated conversational AI with memory and context management.
-

@@ -7,14 +7,8 @@ nav:
   - Splitters
   - metatagger.md
 
-  #- embedders.md 
+  #- embedders.md
 
   - rewriters.md
   - Rerankers
   - Prompt
-
-
-
-
-
-

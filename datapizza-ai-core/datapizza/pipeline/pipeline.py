@@ -58,7 +58,9 @@ class IngestionPipeline:
         if self.vector_store and not self.collection_name:
             raise ValueError("Collection name must be set if vector store is provided")
 
-    def run(self, file_path: str | list[str], metadata: dict | None = None) -> list[Chunk] | None:
+    def run(
+        self, file_path: str | list[str], metadata: dict | None = None
+    ) -> list[Chunk] | None:
         """Run the ingestion pipeline.
 
         Args:
@@ -95,7 +97,9 @@ class IngestionPipeline:
                 "Data returned from pipeline must be a list of Chunk objects"
             )
 
-    async def a_run(self, file_path: str | list[str], metadata: dict | None = None) -> list[Chunk] | None:
+    async def a_run(
+        self, file_path: str | list[str], metadata: dict | None = None
+    ) -> list[Chunk] | None:
         """
         Run the ingestion pipeline asynchronously.
 

@@ -40,5 +40,3 @@
 ::: datapizza.type.StructuredBlock
     options:
         show_source: false
-
-

@@ -87,4 +87,3 @@ async def process_document():
 # Usage in async context
 document = await process_document()
 ```
-

@@ -1,6 +1,5 @@
 import uuid
 
-from jinja2 import Template
 from jinja2.sandbox import SandboxedEnvironment
 
 from datapizza.core.modules.prompt import Prompt

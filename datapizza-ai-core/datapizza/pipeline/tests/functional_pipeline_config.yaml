@@ -5,7 +5,7 @@ modules:
     params:
       api_key: api_key
       model: gpt-4o
-  
+
   - name: openai_client_2
     module: datapizza.clients.openai
     type: OpenAIClient

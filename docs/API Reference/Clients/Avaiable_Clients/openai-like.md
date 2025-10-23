@@ -35,4 +35,3 @@ client = OpenAILikeClient(
 response = client.invoke("What is the capital of France?")
 print(response.content)
 ```
-
