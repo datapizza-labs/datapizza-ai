@@ -175,37 +175,45 @@ def test_replace_in_file_file_not_found(fs_tool):
     result = fs_tool.replace_in_file("non_existent.txt", "a", "b")
     assert "File 'non_existent.txt' not found" in result
 
+
 def test_evaluate_path_on_patterns(fs_tool):
     # Test with include patterns only
     fs_tool.include_patterns = ["*.txt"]
-    fs_tool.exclude_patterns = []
-    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
-    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
 
     # Test with exclude patterns only
-    fs_tool.include_patterns = ["*"]
-    fs_tool.exclude_patterns = ["*.tmp"]
-    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
-    assert fs_tool._evaluate_path_on_patterns("test.tmp") is False
+    fs_tool.include_patterns = ["*.tmp"]
+    assert fs_tool.is_path_valid("test.txt") is False
+    assert fs_tool.is_path_valid("test.tmp") is True
 
     # Test with both include and exclude patterns
     fs_tool.include_patterns = ["*.txt"]
-    fs_tool.exclude_patterns = ["temp.*"]
-    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
-    assert fs_tool._evaluate_path_on_patterns("temp.txt") is False
-    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("temp.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
 
     # Test with regex patterns
     fs_tool.include_patterns = [r".*\.txt$"]
-    fs_tool.exclude_patterns = []
-    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
-    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
 
     # Test with complex patterns
     fs_tool.include_patterns = ["*.txt", "*.md"]
-    fs_tool.exclude_patterns = ["temp.*", "backup.*"]
-    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
-    assert fs_tool._evaluate_path_on_patterns("doc.md") is True
-    assert fs_tool._evaluate_path_on_patterns("temp.txt") is False
-    assert fs_tool._evaluate_path_on_patterns("backup.md") is False
-    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("doc.md") is True
+    assert fs_tool.is_path_valid("temp.txt") is True
+    assert fs_tool.is_path_valid("backup.md") is True
+    assert fs_tool.is_path_valid("test.py") is False
+
+    fs_tool.include_patterns = ["*.txt", "*.md"]
+    assert fs_tool.is_path_valid("specific.txt") is True
+    assert fs_tool.is_path_valid("/dir/specific.txt") is True
+    assert fs_tool.is_path_valid("/dir/specific.py") is False
+
+    fs_tool.include_patterns = ["/specific/dir/*.txt"]
+    fs_tool.exclude_patterns = ["*/secrets.txt"]
+    assert fs_tool.is_path_valid("/specific/dir/script.py") is False
+    assert fs_tool.is_path_valid("/specific/dir/secrets.txt") is False
+    assert fs_tool.is_path_valid("/specific/dir/script.txt") is True
+    assert fs_tool.is_path_valid("/other/dir/script.txt") is False
