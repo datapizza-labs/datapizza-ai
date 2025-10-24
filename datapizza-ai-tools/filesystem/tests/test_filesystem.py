@@ -174,6 +174,7 @@ def test_replace_in_file_multiple_occurrences(fs_tool, tmp_path):
 def test_replace_in_file_file_not_found(fs_tool):
     result = fs_tool.replace_in_file("non_existent.txt", "a", "b")
     assert "File 'non_existent.txt' not found" in result
+
 def test_evaluate_path_on_patterns(fs_tool):
     # Test with include patterns only
     fs_tool.include_patterns = ["*.txt"]

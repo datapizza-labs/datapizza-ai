@@ -31,6 +31,13 @@ def matches_patterns(file_path: str, patterns: list[str]) -> bool:
 class FileSystem:
     """A collection of tools for interacting with the local file system."""
     def __init__(self, exclude_patterns=None, include_patterns=None) -> None:
+        """
+        Initialize the FileSystem.
+
+        Args:
+            exclude_patterns (list[str], optional): Glob or regular expression patterns for paths to exclude. Defaults to None.
+            include_patterns (list[str], optional): Glob or regular expression patterns to include. Defaults to None.
+        """
         self.exclude_patterns = exclude_patterns
         self.include_patterns = include_patterns if include_patterns else ["*"]
 
