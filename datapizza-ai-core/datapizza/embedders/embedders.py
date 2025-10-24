@@ -77,6 +77,7 @@ class ChunkEmbedder(PipelineComponent):
 
             for n, embedding in zip(batch, embeddings, strict=False):
                 if isinstance(embedding, SparseEmbedding):
+                    embedding.name = self.embedding_name
                     n.embeddings.append(embedding)
                 else:
                     n.embeddings.append(
