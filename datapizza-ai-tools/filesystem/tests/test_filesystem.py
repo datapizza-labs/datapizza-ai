@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from datapizza.tools.filesystem import FileSystem
@@ -22,6 +24,16 @@ def test_list_directory(fs_tool, temp_dir):
     result = fs_tool.list_directory(str(temp_dir))
     assert "[FILE] file1.txt" in result
     assert "[DIR] subdir" in result
+
+
+def test_list_directory_with_scope(fs_tool, temp_dir):
+    fs_tool.include_patterns = ["*.txt"]
+    with patch(
+        "os.listdir", return_value=["file_to_include.txt", "file_to_include.py"]
+    ):
+        result = fs_tool.list_directory(str(temp_dir))
+    assert "[FILE] file_to_include.txt" in result
+    assert "[FILE] file_to_include.py" not in result
 
 
 def test_list_directory_empty(fs_tool, tmp_path):
@@ -174,3 +186,46 @@ def test_replace_in_file_multiple_occurrences(fs_tool, tmp_path):
 def test_replace_in_file_file_not_found(fs_tool):
     result = fs_tool.replace_in_file("non_existent.txt", "a", "b")
     assert "File 'non_existent.txt' not found" in result
+
+
+def test_evaluate_path_on_patterns(fs_tool):
+    # Test with include patterns only
+    fs_tool.include_patterns = ["*.txt"]
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
+
+    # Test with exclude patterns only
+    fs_tool.include_patterns = ["*.tmp"]
+    assert fs_tool.is_path_valid("test.txt") is False
+    assert fs_tool.is_path_valid("test.tmp") is True
+
+    # Test with both include and exclude patterns
+    fs_tool.include_patterns = ["*.txt"]
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("temp.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
+
+    # Test with regex patterns
+    fs_tool.include_patterns = [r".*\.txt$"]
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("test.py") is False
+
+    # Test with complex patterns
+    fs_tool.include_patterns = ["*.txt", "*.md"]
+    assert fs_tool.is_path_valid("test.txt") is True
+    assert fs_tool.is_path_valid("doc.md") is True
+    assert fs_tool.is_path_valid("temp.txt") is True
+    assert fs_tool.is_path_valid("backup.md") is True
+    assert fs_tool.is_path_valid("test.py") is False
+
+    fs_tool.include_patterns = ["*.txt", "*.md"]
+    assert fs_tool.is_path_valid("specific.txt") is True
+    assert fs_tool.is_path_valid("/dir/specific.txt") is True
+    assert fs_tool.is_path_valid("/dir/specific.py") is False
+
+    fs_tool.include_patterns = ["/specific/dir/*.txt"]
+    fs_tool.exclude_patterns = ["*/secrets.txt"]
+    assert fs_tool.is_path_valid("/specific/dir/script.py") is False
+    assert fs_tool.is_path_valid("/specific/dir/secrets.txt") is False
+    assert fs_tool.is_path_valid("/specific/dir/script.txt") is True
+    assert fs_tool.is_path_valid("/other/dir/script.txt") is False
