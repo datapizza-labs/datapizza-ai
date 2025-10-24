@@ -9,17 +9,20 @@ from datapizza.type.type import Media, MediaNode
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.document_converter import (
+    DocumentConverter,
+    PdfFormatOption,
+)
 
-from .utils import extract_media_from_docling_bbox, is_pdf_file
+from .utils import extract_media_from_docling_bbox, is_md_file, is_pdf_file
 
 
 class DoclingParser(Parser):
     """
-    Parser that converts PDF files using Docling and then converts the resulting
+    Parser that converts PDF and MD files using Docling and then converts the resulting
     DoclingDocument JSON into a datapizza Node tree.
 
-    - Accepts PDF files directly and processes them using Docling DocumentConverter
+    - Accepts PDF and MD files directly and processes them using Docling DocumentConverter
     - Logical-only hierarchy (no page nodes)
     - Paragraphs are leaf nodes; no sentence splitting by default
     - Full preservation of Docling items stored in node.metadata["docling_raw"],
@@ -41,11 +44,15 @@ class DoclingParser(Parser):
         pipeline_options.ocr_options = ocr_options
 
         return DocumentConverter(
+            allowed_formats=[
+                InputFormat.PDF,
+                InputFormat.MD,
+            ],
             format_options={
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=pipeline_options, backend=PyPdfiumDocumentBackend
-                )
-            }
+                ),
+            },
         )
 
     def _get_converter(self):
@@ -58,32 +65,32 @@ class DoclingParser(Parser):
         """Check if the file is a JSON file."""
         return Path(file_path).suffix.lower() == ".json"
 
-    def parse_to_json(self, pdf_path: str) -> dict:
+    def parse_to_json(self, file_path: str) -> dict:
         """
-        Parse a PDF file using Docling, or if json_path is provided, load that
+        Parse a supported file using Docling, or if json_path is provided, load that
         Docling JSON directly and skip conversion.
 
         Args:
-            pdf_path: Path to the source PDF (required for media extraction)
+            file_path: Path to the source File (required for media extraction)
             json_path: Optional path to a Docling JSON file to skip conversion
 
         Returns:
             Docling document as a dictionary
         """
-        if not is_pdf_file(pdf_path):
+        if not (is_pdf_file(file_path) or is_md_file(file_path)):
             raise ValueError(
-                f"Unsupported pdf_path format: {Path(pdf_path).suffix}. Supported: .pdf"
+                f"Unsupported file format: {Path(file_path).suffix}. Supported: .pdf .md"
             )
 
         converter = self._get_converter()
-        result = converter.convert(pdf_path)
+        result = converter.convert(file_path)
         doc_dict = result.document.export_to_dict()
 
         # Optionally persist intermediate Docling JSON beside the pipeline output
         if self.json_output_dir:
             out_dir = Path(self.json_output_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{Path(pdf_path).stem}.json"
+            out_path = out_dir / f"{Path(file_path).stem}.json"
             with open(out_path, "w", encoding="utf-8") as fp:
                 json.dump(doc_dict, fp, ensure_ascii=False, indent=2)
 
@@ -739,9 +746,9 @@ class DoclingParser(Parser):
 
         return document_node
 
-    def parse(self, pdf_path: str, metadata: dict | None = None) -> Node:
-        json_data = self.parse_to_json(pdf_path=pdf_path)
-        return self._json_to_node(json_data, pdf_path=pdf_path)
+    def parse(self, file_path: str, metadata: dict | None = None) -> Node:
+        json_data = self.parse_to_json(file_path=file_path)
+        return self._json_to_node(json_data, pdf_path=file_path)
 
 
 def _escape_md(text: str) -> str:

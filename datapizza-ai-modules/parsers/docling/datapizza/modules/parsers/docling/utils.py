@@ -93,3 +93,7 @@ def extract_media_from_docling_bbox(
 
 def is_pdf_file(file_path: str) -> bool:
     return Path(file_path).suffix.lower() == ".pdf"
+
+
+def is_md_file(file_path: str) -> bool:
+    return Path(file_path).suffix.lower() == ".md"
