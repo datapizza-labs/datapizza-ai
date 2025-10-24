@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from datapizza.tools.filesystem import FileSystem
@@ -22,6 +24,16 @@ def test_list_directory(fs_tool, temp_dir):
     result = fs_tool.list_directory(str(temp_dir))
     assert "[FILE] file1.txt" in result
     assert "[DIR] subdir" in result
+
+
+def test_list_directory_with_scope(fs_tool, temp_dir):
+    fs_tool.include_patterns = ["*.txt"]
+    with patch(
+        "os.listdir", return_value=["file_to_include.txt", "file_to_include.py"]
+    ):
+        result = fs_tool.list_directory(str(temp_dir))
+    assert "[FILE] file_to_include.txt" in result
+    assert "[FILE] file_to_include.py" not in result
 
 
 def test_list_directory_empty(fs_tool, tmp_path):

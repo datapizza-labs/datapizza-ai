@@ -31,14 +31,14 @@ class FileSystem:
 
     def __init__(self, paths_to_include=None, paths_to_exclude=None) -> None:
         """
-        Initialize the FileSystem. You can set `paths_to_include` and `paths_to_exclude` as glob or regex patterns on file names to reduce the scope of the tool.
+        Initialize the FileSystem. You can set `paths_to_include` and `paths_to_exclude` as glob or regex patterns on paths to reduce the scope of the tool.
         By default, all paths are included. Exclusion patterns are evaluated after the inclusion patterns, Therefore, exclusion patterns should apply subfilters on the inclusion patterns to be effective.
         Example usage::
 
                         FileSystem() #includes the whole file system
                         FileSystem(paths_to_include=["/project/dir/*"]) # includes all the files in /project/dir/
-                        FileSystem(paths_to_exclude=["/project/dir/.env"], paths_to_include=["/project/dir/*"]) # includes all the files in /project/dir/ except .env
-                        FileSystem(paths_to_exclude=["*/.env"], paths_to_include=["/project/dir/*"]) # as above, includes all the files in /project/dir/ except .env
+                        FileSystem(paths_to_exclude=["/project/dir/.env"], paths_to_include=["/project/dir/*"]) # includes all the files and directories in /project/dir/ except .env
+                        FileSystem(paths_to_exclude=["*/.env"], paths_to_include=["/project/dir/*"]) # as above, includes all the files and directories in /project/dir/ except .env
                         FileSystem(paths_to_exclude=["/data/archive.zip"], paths_to_include=["*.zip", "*.txt"]) #includes all txt and zip files except /data/archive.zip
 
         Args:
@@ -59,11 +59,9 @@ class FileSystem:
     @tool
     def list_directory(self, path: str) -> str:
         """
-        Lists all files and directories in a given path.
+        Lists all valid files and directories in a given path.
         :param path: The path of the directory to list.
         """
-        if not self.is_path_valid(path):
-            return f"Path '{path}' is outside the tool's scope."
 
         if not os.path.isdir(path):
             return f"Error: Path '{path}' is not a valid directory."
@@ -76,10 +74,11 @@ class FileSystem:
             formatted_entries = []
             for entry in entries:
                 entry_path = os.path.join(path, entry)
-                if os.path.isdir(entry_path):
-                    formatted_entries.append(f"[DIR] {entry}")
-                else:
-                    formatted_entries.append(f"[FILE] {entry}")
+                if self.is_path_valid(entry_path):
+                    if os.path.isdir(entry_path):
+                        formatted_entries.append(f"[DIR] {entry}")
+                    else:
+                        formatted_entries.append(f"[FILE] {entry}")
 
             return "\n".join(formatted_entries)
         except Exception as e:
