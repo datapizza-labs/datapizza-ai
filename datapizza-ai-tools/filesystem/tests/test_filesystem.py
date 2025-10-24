@@ -174,3 +174,37 @@ def test_replace_in_file_multiple_occurrences(fs_tool, tmp_path):
 def test_replace_in_file_file_not_found(fs_tool):
     result = fs_tool.replace_in_file("non_existent.txt", "a", "b")
     assert "File 'non_existent.txt' not found" in result
+def test_evaluate_path_on_patterns(fs_tool):
+    # Test with include patterns only
+    fs_tool.include_patterns = ["*.txt"]
+    fs_tool.exclude_patterns = []
+    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
+    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+
+    # Test with exclude patterns only
+    fs_tool.include_patterns = ["*"]
+    fs_tool.exclude_patterns = ["*.tmp"]
+    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
+    assert fs_tool._evaluate_path_on_patterns("test.tmp") is False
+
+    # Test with both include and exclude patterns
+    fs_tool.include_patterns = ["*.txt"]
+    fs_tool.exclude_patterns = ["temp.*"]
+    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
+    assert fs_tool._evaluate_path_on_patterns("temp.txt") is False
+    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+
+    # Test with regex patterns
+    fs_tool.include_patterns = [r".*\.txt$"]
+    fs_tool.exclude_patterns = []
+    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
+    assert fs_tool._evaluate_path_on_patterns("test.py") is False
+
+    # Test with complex patterns
+    fs_tool.include_patterns = ["*.txt", "*.md"]
+    fs_tool.exclude_patterns = ["temp.*", "backup.*"]
+    assert fs_tool._evaluate_path_on_patterns("test.txt") is True
+    assert fs_tool._evaluate_path_on_patterns("doc.md") is True
+    assert fs_tool._evaluate_path_on_patterns("temp.txt") is False
+    assert fs_tool._evaluate_path_on_patterns("backup.md") is False
+    assert fs_tool._evaluate_path_on_patterns("test.py") is False

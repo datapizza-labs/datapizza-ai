@@ -1,10 +1,43 @@
+import fnmatch
 import os
+import re
 
 from datapizza.tools import tool
 
 
+
+
+def matches_patterns(file_path: str, patterns: list[str]) -> bool:
+    def _check_pattern(file_path: str, pattern: str) -> bool:
+        # glob patterns
+        regex = fnmatch.translate(pattern.lower())
+        if re.match(regex, file_path.lower()):
+            return True
+        # regex patterns
+        try:
+            if re.match(pattern, file_path.lower()):
+                return True
+        except re.error:
+            pass
+
+        return False
+    if len(patterns) == 0:
+        return True
+
+    return any([_check_pattern(file_path, pattern) for pattern in patterns])
+
+
+
 class FileSystem:
     """A collection of tools for interacting with the local file system."""
+    def __init__(self, exclude_patterns=None, include_patterns=None) -> None:
+        self.exclude_patterns = exclude_patterns
+        self.include_patterns = include_patterns if include_patterns else ["*"]
+
+    def _evaluate_path_on_patterns(self, path: str) -> str:
+        if self.exclude_patterns:
+            return not matches_patterns(path, self.exclude_patterns) and matches_patterns(path, self.include_patterns)
+        return matches_patterns(path, self.include_patterns)
 
     @tool
     def list_directory(self, path: str) -> str:
@@ -12,6 +45,9 @@ class FileSystem:
         Lists all files and directories in a given path.
         :param path: The path of the directory to list.
         """
+        if not self._evaluate_path_on_patterns(path):
+            return f"Path '{path}' is not accessible"
+
         if not os.path.isdir(path):
             return f"Error: Path '{path}' is not a valid directory."
 
@@ -38,6 +74,8 @@ class FileSystem:
         Reads the content of a specified file.
         :param file_path: The path of the file to read.
         """
+        if not self._evaluate_path_on_patterns(file_path):
+            return f"Path '{file_path}' is not accessible"
         try:
             with open(file_path, encoding="utf-8") as f:
                 return f.read()
@@ -53,6 +91,8 @@ class FileSystem:
         :param file_path: The path of the file to write to.
         :param content: The content to write to the file.
         """
+        if not self._evaluate_path_on_patterns(file_path):
+            return f"Path '{file_path}' is not accessible"
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -66,6 +106,8 @@ class FileSystem:
         Creates a new directory at the specified path.
         :param path: The path where the new directory should be created.
         """
+        if not self._evaluate_path_on_patterns(path):
+            return f"Path '{path}' is not accessible"
         try:
             os.makedirs(path, exist_ok=True)
             return f"Successfully created directory '{path}'."
@@ -78,6 +120,8 @@ class FileSystem:
         Deletes a specified file.
         :param file_path: The path of the file to delete.
         """
+        if not self._evaluate_path_on_patterns(file_path):
+            return f"Path '{file_path}' is not accessible"
         try:
             os.remove(file_path)
             return f"Successfully deleted file '{file_path}'."
@@ -93,6 +137,8 @@ class FileSystem:
         :param path: The path of the directory to delete.
         :param recursive: If True, deletes the directory and all its contents.
         """
+        if not self._evaluate_path_on_patterns(path):
+            return f"Path '{path}' is not accessible"
         try:
             if not os.path.exists(path):
                 return f"Error: Directory '{path}' not found."
@@ -115,6 +161,10 @@ class FileSystem:
         :param source_path: The current path of the file or directory.
         :param destination_path: The new path for the file or directory.
         """
+        if not self._evaluate_path_on_patterns(source_path):
+            return f"Path '{source_path}' is not accessible"
+        if not self._evaluate_path_on_patterns(destination_path):
+            return f"Path '{destination_path}' is not accessible"
         try:
             os.rename(source_path, destination_path)
             return f"Successfully moved '{source_path}' to '{destination_path}'."
@@ -130,6 +180,10 @@ class FileSystem:
         :param source_path: The path of the file to copy.
         :param destination_path: The destination path for the new file.
         """
+        if not self._evaluate_path_on_patterns(source_path):
+            return f"Path '{source_path}' is not accessible"
+        if not self._evaluate_path_on_patterns(destination_path):
+            return f"Path '{destination_path}' is not accessible"
         try:
             import shutil
 
@@ -151,6 +205,9 @@ class FileSystem:
         :param old_string: The exact block of text to be replaced (including context).
         :param new_string: The new block of text to insert.
         """
+
+        if not self._evaluate_path_on_patterns(file_path):
+            return f"Path '{file_path}' is not accessible"
         try:
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
