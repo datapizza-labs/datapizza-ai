@@ -1,5 +1,3 @@
-import pytest
-
 from datapizza.clients.bedrock import BedrockClient
 
 
@@ -21,8 +19,7 @@ def test_async_client_initialization():
     assert client.a_region_name == "us-east-1"
 
 
-@pytest.mark.asyncio
-async def test_a_invoke_method_exists():
+def test_a_invoke_method_exists():
     """Test that _a_invoke method is implemented and doesn't raise NotImplementedError"""
     client = BedrockClient(
         aws_access_key_id="test_key",
@@ -35,8 +32,7 @@ async def test_a_invoke_method_exists():
     assert callable(client._a_invoke)
 
 
-@pytest.mark.asyncio
-async def test_a_stream_invoke_method_exists():
+def test_a_stream_invoke_method_exists():
     """Test that _a_stream_invoke method is implemented and doesn't raise NotImplementedError"""
     client = BedrockClient(
         aws_access_key_id="test_key",
