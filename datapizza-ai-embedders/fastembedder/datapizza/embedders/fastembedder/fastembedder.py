@@ -25,7 +25,7 @@ class FastEmbedder(BaseEmbedder):
             model_name=model_name, cache_dir=cache_dir
         )
 
-    def embed(self, text: str | list[str]):
+    def embed(self, text: str | list[str], model_name: str | None = None):
         if isinstance(text, list):
             embeddings = [next(iter(self.embedder.embed(t))) for t in text]
             return [
@@ -44,7 +44,7 @@ class FastEmbedder(BaseEmbedder):
                 indices=embedding.indices.tolist(),
             )
 
-    def a_embed(self, text: str | list[str]):
+    def a_embed(self, text: str | list[str], model_name: str | None = None):
         if isinstance(text, list):
             embeddings = [next(iter(self.embedder.embed(t))) for t in text]
             return [
