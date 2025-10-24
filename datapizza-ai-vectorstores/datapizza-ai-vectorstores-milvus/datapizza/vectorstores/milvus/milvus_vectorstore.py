@@ -1,4 +1,3 @@
-# vector_store/milvus_vectorstore.py
 import logging
 from typing import Any, Generator, Optional
 import asyncio
