@@ -1,10 +1,11 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from datapizza.agents.agent import PLANNING_PROMT, Agent, StepResult
+from datapizza.agents.agent import Agent, PLANNING_PROMT, StepResult
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
 from datapizza.tools import tool
+from datapizza.type import FunctionCallResultBlock, TextBlock
 
 
 class TestBaseAgents:
@@ -101,6 +102,38 @@ class TestBaseAgents:
         assert res[0].text == "H"
         assert res[1].text == "He"
         assert res[2].text == "Hel"
+
+    def test_tools_with_end_invoke(self):
+        @tool(end=True)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+        )
+        res = agent.run("function call")
+        assert len(res.tools_used)
+        assert isinstance(res.content[-2], FunctionCallResultBlock)
+        assert isinstance(res.content[-1], TextBlock)
+        assert res.text == "tool called"
+
+    def test_tools_with_no_end_invoke(self):
+        @tool
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+        )
+        res = agent.run("function call")
+        assert len(res.tools_used) == 0
+        assert isinstance(res.content[-1], TextBlock)
 
 
 class TestStatelessAgents:
