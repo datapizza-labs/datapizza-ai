@@ -17,9 +17,13 @@ class Distance(Enum):
 
 class VectorConfig(BaseModel):
     name: str
-    dimensions: int
     format: EmbeddingFormat = EmbeddingFormat.DENSE
+    dimensions: int | None = None
     distance: Distance = Distance.COSINE
+
+    def model_post_init(self, __context) -> None:
+        if self.format == EmbeddingFormat.DENSE and self.dimensions is None:
+            raise ValueError("Dimensions must be specified for dense embeddings")
 
 
 class Vectorstore(ChainableProducer):
