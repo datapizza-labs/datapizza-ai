@@ -38,24 +38,25 @@ class StepResult:
 
     @property
     def text(self) -> str:
-        if not len(self.tools_used) or any(
-            [not used_tool.tool.end_invoke for used_tool in self.tools_used]
+        tools_end_param = {block.id: block.tool.end_invoke for block in self.tools_used}
+
+        if not len(tools_end_param) or any(
+            [
+                not used_tool_is_end_invoke
+                for _, used_tool_is_end_invoke in tools_end_param.items()
+            ]
         ):
             # no tools used, or tools with end=False used.
             return "\n".join(
                 block.content for block in self.content if isinstance(block, TextBlock)
             )
         else:
-            tools_end_param = {
-                block.id: block.tool.end_invoke
-                for block in self.content
-                if isinstance(block, FunctionCallBlock)
-            }
+
             return "\n".join(
                 block.result
                 for block in self.content
                 if isinstance(block, FunctionCallResultBlock)
-                and tools_end_params[block.id]
+                and tools_end_param[block.id]
             )
 
     @property
