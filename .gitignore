@@ -144,6 +144,29 @@ ENV/
 env.bak/
 venv.bak/
 
+# MOOD Private - Dati sensibili e privati
+*.env
+agent_learning.json
+
+# Configurazioni personali
+configs/personal_profile.yaml
+configs/target_organizations.yaml
+configs/email_config.yaml
+
+# Output e dati generati
+outputs/
+data/
+generated_images/
+linkedin_drafts/
+docs/agent_reports/
+
+# Database
+*.db
+
+# File temporanei
+test_redirect.html
+launch_dashboard.sh
+
 # Spyder project settings
 .spyderproject
 .spyproject
