@@ -207,9 +207,9 @@ class AgentMemory:
         # Calcola last 7 days activity
         last_week = datetime.now() - timedelta(days=7)
         week_contacts = sum(1 for c in memory.get("contacts_hunted", [])
-                          if datetime.fromisoformat(c.get("timestamp", "")) > last_week)
+                          if c.get("timestamp") and datetime.fromisoformat(c["timestamp"]) > last_week)
         week_emails = sum(1 for e in memory.get("emails_sent", [])
-                        if datetime.fromisoformat(e.get("timestamp", "")) > last_week)
+                        if e.get("timestamp") and datetime.fromisoformat(e["timestamp"]) > last_week)
         
         insights = f"""
 LEARNED PATTERNS (Data-Driven Insights):
@@ -253,7 +253,7 @@ Based on these patterns, propose:
             if key in memory:
                 memory[key] = [
                     item for item in memory[key]
-                    if datetime.fromisoformat(item.get("timestamp", "")) > cutoff
+                    if item.get("timestamp") and datetime.fromisoformat(item["timestamp"]) > cutoff
                 ]
         
         self._save_memory(memory)

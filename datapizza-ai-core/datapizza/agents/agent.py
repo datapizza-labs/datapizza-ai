@@ -145,6 +145,11 @@ class Agent:
 
         self._lock = Lock()
 
+    @property
+    def memory(self) -> Memory:
+        """Get the agent's memory."""
+        return self._memory
+
     def can_call(self, agent: Union[list["Agent"], "Agent"]):
         if isinstance(agent, Agent):
             agent = [agent]

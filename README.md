@@ -118,6 +118,103 @@ response = agent.run("What is the weather in Rome?")
 # output: The weather in Rome is sunny
 ```
 
+### 👤 Personal Agent (example)
+
+Esempio minimale di agente personale per promozione e outreach, incluso in questo repo.
+
+Prerequisiti opzionali:
+- Per sfruttare tool-calling e pianificazione LLM, imposta `OPENAI_API_KEY` (altrimenti userà un client mock):
+
+```bash
+export OPENAI_API_KEY=sk-... # opzionale
+```
+
+Comandi disponibili:
+
+```bash
+# Cerca prospect (usa DuckDuckGo) e salva in outputs/prospects.csv
+python tools/personal_agent_cli.py prospects --industry "Design" --location "Milano" --size SMB --role Founder
+
+# Arricchisci i prospect con dominio, linkedin, email candidates
+python tools/personal_agent_cli.py enrich-prospects --from-csv outputs/prospects.csv
+
+# Genera bozze email (con A/B testing) per ciascun prospect del CSV arricchito
+python tools/personal_agent_cli.py email --offer "servizi di design" --from-csv outputs/prospects_enriched.csv --ab --tone consulenziale --cta-link "$CALENDLY_LINK"
+
+# Genera un post LinkedIn e salva in outputs/linkedin_post.md
+python tools/personal_agent_cli.py linkedin-post --topic "nuovo servizio di design conversazionale" --tone professionale --audience clienti --length breve --cta-link "$CALENDLY_LINK"
+
+# Chatta con l'agente (se hai OPENAI_API_KEY userà OpenAI; altrimenti MockClient)
+python tools/personal_agent_cli.py chat --prompt "Suggerisci un piano di outreach per startup a Milano"
+
+# Campagna end-to-end (prospects -> enrich -> email -> linkedin-post)
+python tools/personal_agent_cli.py campaign --industry Design --location Milano --offer "audit UX" --post-topic "nuovo servizio audit UX" --ab --cta-link "$CALENDLY_LINK"
+```
+
+I file di output vengono salvati in `outputs/` nella root del progetto.
+
+#### 🧑‍💼 Profilo personale
+
+Puoi definire chi sei, cosa offri e il tuo target in `configs/personal_profile.yaml`. Questo profilo viene usato dall'agente per impostare prompt, tono e CTA di default.
+
+Campi disponibili:
+
+- **Base**: name, title, about, services, offer_default
+- **Preferences**: tone (email/linkedin), cta_link, email_from
+- **Targets**: industries, locations, company_size, roles
+- **Featured Product**: Prodotto/servizio specifico da promuovere con descrizione dettagliata, features, target audience, benefits, use cases, CTA
+
+##### 🎯 Esempio: Promozione MOOD (Featured Product)
+
+Il profilo in `configs/personal_profile.yaml` include un esempio completo di promozione di **MOOD: Adaptive Artistic Environment** - un sistema AI per installazioni artistiche interattive.
+
+Il featured product viene utilizzato dall'agente per:
+- Arricchire il system prompt con informazioni dettagliate sul prodotto
+- Generare email e post LinkedIn focalizzati sul prodotto
+- Utilizzare automaticamente i benefici e use case nelle comunicazioni
+
+**Template disponibili** in `docs/examples/`:
+- `mood_email_template.md` - 4 varianti di email per target diversi (musei, gallerie, event manager, sound designer)
+- `mood_linkedin_posts.md` - 5 tipi di post (lancio, case study, technical deep dive, behind the scenes, feature highlight)
+
+**Uso con CLI:**
+
+```bash
+# Email per museo con profilo MOOD
+python tools/personal_agent_cli.py email \
+  --offer "sistema MOOD per exhibition interattiva" \
+  --companies "Museo MAXXI Roma" \
+  --tone professionale \
+  --profile configs/personal_profile.yaml
+
+# Post LinkedIn sul lancio MOOD
+python tools/personal_agent_cli.py linkedin-post \
+  --topic "MOOD sistema AI per installazioni artistiche" \
+  --tone professionale \
+  --audience "musei, gallerie, event manager" \
+  --profile configs/personal_profile.yaml
+```
+
+**Nota:** I template richiedono `OPENAI_API_KEY` per generazione con LLM. Senza API key, il sistema usa MockClient.
+
+#### 🖥️ Web UI (Streamlit)
+
+Un'interfaccia web semplice è inclusa per orchestrare il flusso end-to-end:
+
+```bash
+# (opzionale) abilita OpenAI
+export OPENAI_API_KEY=sk-...
+
+# Avvia la webapp
+streamlit run tools/webapp/streamlit_app.py
+```
+
+La UI permette di:
+- Cercare prospect e salvare CSV
+- Arricchire i prospect con dominio/LinkedIn/email candidates
+- Generare email (anche A/B) e post LinkedIn
+- Chattare con l'agente
+
 
 ## 📊 Detailed Tracing
 

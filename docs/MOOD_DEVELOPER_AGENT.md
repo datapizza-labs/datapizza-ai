@@ -333,7 +333,7 @@ python tools/mood_dev_agent.py create-demo \
 crontab -e
 
 # Add this line (assicurati che GOOGLE_API_KEY sia configurata nell'ambiente del cron in modo sicuro):
-0 22 * * 0 cd /Users/mainenti/datapizza-ai-0.0.2 && source .venv/bin/activate && python tools/mood_dev_agent.py weekly-sprint --output /Users/mainenti/mood-reports/sprint-$(date +\%Y\%m\%d).json && python tools/mood_dev_agent.py monitor-events --output /Users/mainenti/mood-reports/events-$(date +\%Y\%m\%d).md
+0 22 * * 0 cd /path/to/datapizza-ai && source .venv/bin/activate && python tools/mood_dev_agent.py weekly-sprint --output ~/mood-reports/sprint-$(date +\%Y\%m\%d).json && python tools/mood_dev_agent.py monitor-events --output ~/mood-reports/events-$(date +\%Y\%m\%d).md
 ```
 
 Suggerimento: evita di esportare chiavi direttamente nella riga di cron. Preferisci una delle seguenti opzioni:

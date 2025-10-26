@@ -59,10 +59,6 @@ class ContactDatabase:
     def _create_tables(self):
         """Crea schema database"""
         cursor = self.conn.cursor()
-    
-    def _create_tables(self):
-        """Crea schema database"""
-        cursor = self.conn.cursor()
         
         # Tabella contatti
         cursor.execute("""

@@ -54,6 +54,22 @@ class ContactHunterAgent:
     5. Assegna confidence score
     """
     
+    # Parole chiave per identificare decision maker
+    DECISION_MAKER_KEYWORDS = [
+        'director', 'direttore', 'direttrice',
+        'curator', 'curatore', 'curatrice',
+        'president', 'presidente',
+        'ceo', 'founder', 'co-founder',
+        'artistic', 'artistico',
+        'general manager', 'responsabile'
+    ]
+    
+    # Domini email comuni (personali, non aziendali)
+    COMMON_PERSONAL_DOMAINS = [
+        'gmail.com', 'yahoo.com', 'hotmail.com', 
+        'outlook.com', 'icloud.com', 'protonmail.com'
+    ]
+    
     # Pattern per trovare email
     EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     
@@ -255,9 +271,8 @@ class ContactHunterAgent:
         
         # Domain non deve essere comune (gmail, yahoo, etc per organizzazioni)
         domain = email.split('@')[1]
-        common_domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com']
         
-        if domain in common_domains:
+        if domain in self.COMMON_PERSONAL_DOMAINS:
             return False  # Probabile email personale, non aziendale
         
         return True
