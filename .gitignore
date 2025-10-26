@@ -167,6 +167,11 @@ docs/agent_reports/
 test_redirect.html
 launch_dashboard.sh
 
+# Docs privati (NON da committare - solo locali)
+docs/LINKEDIN_API_SETUP.md
+docs/MOOD_PROMOTION_GUIDE.md
+docs/GEMINI_SETUP.md
+
 # Spyder project settings
 .spyderproject
 .spyproject

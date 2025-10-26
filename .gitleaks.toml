@@ -1,0 +1,49 @@
+# Gitleaks configuration to prevent secrets from being committed
+# https://github.com/gitleaks/gitleaks
+
+title = "Gitleaks config for datapizza-ai"
+
+[extend]
+# useDefault will extend the base configuration with all default gitleaks rules
+useDefault = true
+
+[[rules]]
+id = "google-api-key"
+description = "Google API Key"
+regex = '''AIza[0-9A-Za-z\-_]{35}'''
+tags = ["key", "Google"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["key", "OpenAI"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API Key"
+regex = '''sk-ant-[a-zA-Z0-9\-_]{95,}'''
+tags = ["key", "Anthropic"]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|access[_-]?key)\s*[=:]\s*['"]?[a-zA-Z0-9\-_]{20,}['"]?'''
+tags = ["key", "generic"]
+
+[allowlist]
+description = "Allowlist for safe patterns"
+paths = [
+    '''\.venv/''',
+    '''node_modules/''',
+    '''\.git/''',
+]
+
+# Ignore placeholder examples in docs
+regexes = [
+    '''YOUR_API_KEY''',
+    '''your-api-key''',
+    '''your_key_here''',
+    '''<YOUR_.*>''',
+    '''EXAMPLE_KEY''',
+]
