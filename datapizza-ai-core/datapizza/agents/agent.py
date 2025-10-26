@@ -46,7 +46,7 @@ class StepResult:
                 block.content for block in self.content if isinstance(block, TextBlock)
             )
         else:
-            tools_end_params = {
+            tools_end_param = {
                 block.id: block.tool.end_invoke
                 for block in self.content
                 if isinstance(block, FunctionCallBlock)
