@@ -40,7 +40,7 @@ class StepResult:
     def text(self) -> str:
         tools_end_param = {block.id: block.tool.end_invoke for block in self.tools_used}
 
-        if not len(tools_end_param) or any(
+        if not len(tools_end_param) or all(
             [
                 not used_tool_is_end_invoke
                 for _, used_tool_is_end_invoke in tools_end_param.items()
