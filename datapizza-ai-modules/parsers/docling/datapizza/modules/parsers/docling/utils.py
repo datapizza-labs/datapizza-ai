@@ -1,6 +1,3 @@
-from pathlib import Path
-
-
 def extract_media_from_docling_bbox(
     bbox: dict,
     file_path: str,
@@ -89,7 +86,3 @@ def extract_media_from_docling_bbox(
         buf = io.BytesIO()
         crop.save(buf, format="PNG")
         return base64.b64encode(buf.getvalue()).decode("utf-8")
-
-
-def is_pdf_file(file_path: str) -> bool:
-    return Path(file_path).suffix.lower() == ".pdf"
