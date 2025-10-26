@@ -116,8 +116,7 @@ class TestBaseAgents:
         )
         res = agent.run("function call")
         assert len(res.tools_used)
-        assert isinstance(res.content[-2], FunctionCallResultBlock)
-        assert isinstance(res.content[-1], TextBlock)
+        assert isinstance(res.content[-1], FunctionCallResultBlock)
         assert res.text == "tool called"
 
     def test_tools_with_no_end_invoke(self):

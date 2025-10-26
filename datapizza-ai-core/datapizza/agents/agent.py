@@ -38,9 +38,17 @@ class StepResult:
 
     @property
     def text(self) -> str:
-        return "\n".join(
-            block.content for block in self.content if isinstance(block, TextBlock)
-        )
+        if not len(self.tools_used) or not self.tools_used[-1].tool.end_invoke:
+            # no tools used, or tools with end=False used.
+            return "\n".join(
+                block.content for block in self.content if isinstance(block, TextBlock)
+            )
+        else:
+            return "\n".join(
+                block.result
+                for block in self.content
+                if isinstance(block, FunctionCallResultBlock)
+            )
 
     @property
     def tools_used(self) -> list[FunctionCallBlock]:
@@ -297,16 +305,7 @@ class Agent:
                 if isinstance(result, ClientResponse):
                     yield result
                 elif isinstance(result, StepResult):
-                    if (
-                        not len(result.tools_used)
-                        or not result.tools_used[-1].tool.end_invoke
-                    ):
-                        # no tools used, or tools with end=False used.
-                        step_output = result.text
-                    else:
-                        step_output = result.content[-1].result
-                        result.content += [TextBlock(content=result.content[-1].result)]
-
+                    step_output = result.text
                     yield result
 
             if step_output and self._terminate_on_text:
