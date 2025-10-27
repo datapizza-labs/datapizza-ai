@@ -23,7 +23,7 @@ dependencies = [
     "datapizza-ai-core>=0.0.1",
     "datapizza-ai-clients-openai>=0.0.1",
     "datapizza-ai-embedders-openai>=0.0.1",
-    "datapizza-ai-vectorstores-qdrant>=0.0.1",
+    "datapizza-ai-vectorstores-qdrant>=0.0.1"
 ]
 
 # Development dependencies
@@ -53,6 +53,8 @@ members = [
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
     "datapizza-ai-embedders/openai",
+    # Memory
+    "datapizza-ai-persistent-memory/redis",
 
     # Modules
     "datapizza-ai-modules/parsers/azure",
@@ -108,6 +110,10 @@ datapizza-ai-tools-duckduckgo = {workspace = true}
 datapizza-ai-tools-filesystem = {workspace = true}
 datapizza-ai-tools-sqldatabase = {workspace = true}
 datapizza-ai-tools-web-fetch = {workspace = true}
+
+# Memory
+
+datapizza-ai-persistent-memory-redis = { workspace = true }
 
 
 # Hatch build configuration
