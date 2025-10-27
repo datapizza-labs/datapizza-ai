@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 # Project metadata
 [project]
-name = "datapizza-ai-persistent-memory-redis"
+name = "datapizza-ai-memory-redis"
 version = "0.0.1"
 description = "An implementation using Redis for datapizza-ai memory"
 readme = "README.md"
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0,<0.1.0",
+    "datapizza-ai-core>=0.0.0",
     "redis>=5.2.1,<6.0.0",
 ]
 

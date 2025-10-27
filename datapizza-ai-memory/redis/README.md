@@ -24,7 +24,7 @@ To install the required dependencies, run:
 # Install the core framework
 pip install datapizza-ai
 # Install the Redis Memory
-pip install datapizza-ai-persistent-memory-redis
+pip install datapizza-ai-memory-redis
 ```
 
 ## Usage
@@ -32,7 +32,7 @@ pip install datapizza-ai-persistent-memory-redis
 ### Initialization
 
 ```python
-from datapizza.persistent_memory.redis import RedisMemory
+from datapizza.memory.redis import RedisMemory
 
 # Initialize RedisMemory with user_id and session_id
 memory = RedisMemory(user_id="unique_id_for_user", session_id="unique_id_for_chat_session")

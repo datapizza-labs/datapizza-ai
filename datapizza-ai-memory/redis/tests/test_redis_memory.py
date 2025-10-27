@@ -1,5 +1,5 @@
 import pytest
-from datapizza.persistent_memory.redis import RedisMemory
+from datapizza.memory.redis import RedisMemory
 
 from datapizza.type import ROLE, TextBlock
 
