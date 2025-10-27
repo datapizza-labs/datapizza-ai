@@ -99,10 +99,10 @@ class RedisMemory(Memory):
         turn_key = self._get_turn_key(index)
 
         # Add turn to Redis index
-        user1Set = self.redis.json().set(f"{turn_key}", Path.root_path(), {"session_id": self.session_id,
-                                                                           "user_id": self.user_id,
-                                                                           "content": self._serialize_turn(turn),
-                                                                           "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        self.redis.json().set(f"{turn_key}", Path.root_path(), {"session_id": self.session_id,
+                                                               "user_id": self.user_id,
+                                                               "content": self._serialize_turn(turn),
+                                                               "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
 
 
 
