@@ -12,9 +12,7 @@ from datapizza.type import Block, FunctionCallBlock, ROLE
 
 
 class RedisMemory(Memory):
-    """
-    A Redis-based memory implementation that extends the original Memory class.
-    """
+
 
     def __init__(
         self,
@@ -27,6 +25,19 @@ class RedisMemory(Memory):
         force_new_index: bool = False,
         index_name: str = "idx:history",
     ):
+        """
+        A Redis-based memory implementation that extends the original Memory class.
+        It creates a `index_name` index on user_id and session_id.
+
+        :param user_id: unique id of the user.
+        :param session_id: unique id of the session
+        :param host: Redis host address
+        :param port: Redis port number
+        :param db: the database number
+        :param expiration_time: the messages TTL
+        :param force_new_index: whether to force a new index
+        :param index_name: the name of the index
+        """
         self.redis = redis.Redis(host=host, port=port, db=db,decode_responses=True)
 
         self.expiration_time = expiration_time

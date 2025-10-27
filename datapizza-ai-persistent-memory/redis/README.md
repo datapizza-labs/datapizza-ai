@@ -54,7 +54,7 @@ memory.add_turn(blocks=[TextBlock(content="How are you?"), TextBlock(content="I'
 
 ```python
 # Fetch all session messages
-messages = memory.fetch_session_messages()
+messages = memory.memory
 
 # Print messages
 for message in messages:
