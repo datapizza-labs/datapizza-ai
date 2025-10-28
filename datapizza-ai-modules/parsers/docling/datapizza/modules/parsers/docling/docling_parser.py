@@ -8,12 +8,13 @@ from datapizza.type import Node, NodeType
 from datapizza.type.type import Media, MediaNode
 
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import (
     DocumentConverter,
     PdfFormatOption,
 )
 
+from .ocr_options import OCROptions
 from .utils import extract_media_from_docling_bbox
 
 
@@ -31,18 +32,36 @@ class DoclingParser(Parser):
     - Reading order follows body.children ($ref list)
     - Images and tables are mapped to FIGURE and TABLE nodes respectively, with bbox-only metadata
     """
+    def __init__(
+        self,
+        json_output_dir: str | None = None,
+        ocr_options: OCROptions | None = None,
+    ):
+        """
+        Initialize DoclingParser with optional OCR configuration.
 
-    def __init__(self, json_output_dir: str | None = None):
+        Args:
+            json_output_dir: Optional directory to save intermediate Docling JSON results.
+            ocr_options: OCR configuration. Defaults to EasyOCR (backward compatible) if not provided.
+        """
         self.converter = None
         # Optional directory to save intermediate Docling JSON results
         self.json_output_dir = json_output_dir
+        self.ocr_options = ocr_options or OCROptions()
 
     def _create_converter(self):
-        """Create a Docling DocumentConverter."""
-        # Configure pipeline options for table structure detection and OCR
-        pipeline_options = PdfPipelineOptions(do_table_structure=True)
-        ocr_options = EasyOcrOptions(force_full_page_ocr=True)
-        pipeline_options.ocr_options = ocr_options
+        """
+        Create a Docling DocumentConverter with configured OCR options.
+
+        Uses self.ocr_options to determine which OCR engine to use and
+        passes the appropriate configuration to Docling.
+
+        Returns:
+            Configured DocumentConverter instance
+        """
+        # Convert internal OCR options to Docling pipeline kwargs
+        pipeline_kwargs = self.ocr_options.to_docling_pipeline_options()
+        pipeline_options = PdfPipelineOptions(**pipeline_kwargs)
 
         return DocumentConverter(
             format_options={

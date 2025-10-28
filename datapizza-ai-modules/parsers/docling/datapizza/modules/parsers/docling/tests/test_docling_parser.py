@@ -4,6 +4,7 @@ import pytest
 from datapizza.type import Node, NodeType
 
 from datapizza.modules.parsers.docling.docling_parser import DoclingParser
+from datapizza.modules.parsers.docling.ocr_options import OCREngine, OCROptions
 
 
 def test_parse_with_file_path(mock_docling_parser, tmp_path):
@@ -54,3 +55,68 @@ def test_parse_missing_file_path_raises():
     parser = DoclingParser()
     with pytest.raises(ValueError, match="Missing required argument: file_path"):
         parser.parse()
+
+
+def test_parser_ocr_options_backward_compatibility(mock_docling_parser):
+    """Test that parser works without explicit OCR options (backward compatible)."""
+    # Parser created without ocr_options should use default (EasyOCR)
+    assert mock_docling_parser.ocr_options.engine == OCREngine.EASY_OCR
+    assert mock_docling_parser.ocr_options.easy_ocr_force_full_page is True
+
+
+def test_parser_with_custom_ocr_options(mock_docling_parser, monkeypatch):
+    """Test parser with custom OCR options."""
+    custom_options = OCROptions(
+        engine=OCREngine.TESSERACT,
+        tesseract_lang=["ita"],
+    )
+    parser = DoclingParser(ocr_options=custom_options)
+
+    assert parser.ocr_options.engine == OCREngine.TESSERACT
+    assert parser.ocr_options.tesseract_lang == ["ita"]
+
+
+def test_parser_with_multilingual_tesseract(mock_docling_parser):
+    """Test parser with multiple languages for Tesseract."""
+    custom_options = OCROptions(
+        engine=OCREngine.TESSERACT,
+        tesseract_lang=["ita", "eng", "fra"],
+    )
+    parser = DoclingParser(ocr_options=custom_options)
+
+    assert parser.ocr_options.engine == OCREngine.TESSERACT
+    assert parser.ocr_options.tesseract_lang == ["ita", "eng", "fra"]
+
+
+def test_parser_with_autodetect_tesseract(mock_docling_parser):
+    """Test parser with autodetect for Tesseract."""
+    custom_options = OCROptions(
+        engine=OCREngine.TESSERACT,
+        tesseract_lang=["auto"],
+    )
+    parser = DoclingParser(ocr_options=custom_options)
+
+    assert parser.ocr_options.engine == OCREngine.TESSERACT
+    assert parser.ocr_options.tesseract_lang == ["auto"]
+
+
+def test_parser_with_ocr_disabled(mock_docling_parser):
+    """Test parser with OCR disabled."""
+    custom_options = OCROptions(engine=OCREngine.NONE)
+    parser = DoclingParser(ocr_options=custom_options)
+
+    assert parser.ocr_options.engine == OCREngine.NONE
+
+
+def test_parser_preserves_json_output_dir_with_ocr_options(tmp_path):
+    """Test parser preserves json_output_dir when using custom OCR options."""
+    custom_options = OCROptions(engine=OCREngine.TESSERACT)
+    parser = DoclingParser(
+        json_output_dir=str(tmp_path),
+        ocr_options=custom_options,
+    )
+
+    assert parser.json_output_dir == str(tmp_path)
+    assert parser.ocr_options.engine == OCREngine.TESSERACT
+
+
