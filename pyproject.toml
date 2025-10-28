@@ -62,6 +62,7 @@ members = [
 
     # Vectorstores
     "datapizza-ai-vectorstores/datapizza-ai-vectorstores-qdrant",
+    "datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus",
 
     # Cache
     "datapizza-ai-cache/redis",
