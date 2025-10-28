@@ -1,8 +1,9 @@
+from datapizza.vectorstores.qdrant import QdrantVectorstore
+
 from datapizza.core.models import PipelineComponent
 from datapizza.core.vectorstore import VectorConfig
 from datapizza.pipeline import IngestionPipeline
 from datapizza.type import Chunk, DenseEmbedding, Node
-from datapizza.vectorstores.qdrant import QdrantVectorstore
 
 
 class CustomSplitter(PipelineComponent):
