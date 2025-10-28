@@ -68,74 +68,111 @@ class IngestionPipeline:
             metadata (dict, optional): Metadata to add to the ingested chunks. Defaults to None.
 
         Returns:
-            if vector_store is set does not return anything, otherwise returns the last result of the pipeline.
+            list[Chunk] | None: If vector_store is not set, returns all accumulated chunks from all files.
+                                If vector_store is set, returns None after storing all chunks.
         """
-        if isinstance(file_path, str | list):
-            data = self.pipeline.run(file_path)
+        # Normalize to list for uniform processing
+        if isinstance(file_path, str):
+            file_paths = [file_path]
+        elif isinstance(file_path, list):
+            # Validate that all elements are strings
+            if not all(isinstance(fp, str) for fp in file_path):
+                raise ValueError("All elements in file_path list must be strings")
+            file_paths = file_path
         else:
             raise ValueError("file_path must be a string or a list of strings")
 
+        all_chunks = []
+
+        # Process each file path
+        for fp in file_paths:
+            data = self.pipeline.run(fp)
+
+            if not self.vector_store:
+                # If no vector store, accumulate results
+                if isinstance(data, list):
+                    all_chunks.extend(data)
+                else:
+                    all_chunks.append(data)
+            else:
+                # Validate chunk data immediately
+                if not isinstance(data, list) or not all(
+                    isinstance(item, Chunk) for item in data
+                ):
+                    raise ValueError(
+                        f"Data returned from pipeline for '{fp}' must be a list of Chunk objects"
+                    )
+                all_chunks.extend(data)
+
         if not self.vector_store:
-            return data
+            return all_chunks
 
-        if not isinstance(data, list) or not all(
-            isinstance(item, Chunk) for item in data
-        ):
-            raise ValueError(
-                "Data returned from pipeline must be a list of Chunk objects"
-            )
-
-        # Adding metadata to the chunks
+        # Adding metadata to all accumulated chunks
         if metadata:
-            for chunk in data:
+            for chunk in all_chunks:
                 chunk.metadata.update(metadata)
 
-        if all(isinstance(node, Chunk) for node in data):
-            self.vector_store.add(data, self.collection_name)
-        else:
-            raise ValueError(
-                "Data returned from pipeline must be a list of Chunk objects"
-            )
+        # Add all chunks to vector store at once (only if we have chunks)
+        if all_chunks:
+            self.vector_store.add(all_chunks, self.collection_name)
 
     async def a_run(
         self, file_path: str | list[str], metadata: dict | None = None
     ) -> list[Chunk] | None:
-        """
-        Run the ingestion pipeline asynchronously.
+        """Run the ingestion pipeline asynchronously.
 
         Args:
             file_path (str | list[str]): The file path or list of file paths to ingest.
             metadata (dict, optional): Metadata to add to the ingested chunks. Defaults to None.
 
         Returns:
-            if vector_store is set does not return anything, otherwise returns the last result of the pipeline.
+            list[Chunk] | None: If vector_store is not set, returns all accumulated chunks from all files.
+                                If vector_store is set, returns None after storing all chunks.
         """
-        if isinstance(file_path, str | list):
-            data = await self.pipeline.a_run(file_path)
+        # Normalize to list for uniform processing
+        if isinstance(file_path, str):
+            file_paths = [file_path]
+        elif isinstance(file_path, list):
+            # Validate that all elements are strings
+            if not all(isinstance(fp, str) for fp in file_path):
+                raise ValueError("All elements in file_path list must be strings")
+            file_paths = file_path
         else:
             raise ValueError("file_path must be a string or a list of strings")
 
+        all_chunks = []
+
+        # Process each file path
+        for fp in file_paths:
+            data = await self.pipeline.a_run(fp)
+
+            if not self.vector_store:
+                # If no vector store, accumulate results
+                if isinstance(data, list):
+                    all_chunks.extend(data)
+                else:
+                    all_chunks.append(data)
+            else:
+                # Validate chunk data immediately
+                if not isinstance(data, list) or not all(
+                    isinstance(item, Chunk) for item in data
+                ):
+                    raise ValueError(
+                        f"Data returned from pipeline for '{fp}' must be a list of Chunk objects"
+                    )
+                all_chunks.extend(data)
+
         if not self.vector_store:
-            return data
+            return all_chunks
 
-        if not isinstance(data, list) or not all(
-            isinstance(item, Chunk) for item in data
-        ):
-            raise ValueError(
-                "Data returned from pipeline must be a list of Chunk objects"
-            )
-
-        # Adding metadata to the chunks
+        # Adding metadata to all accumulated chunks
         if metadata:
-            for chunk in data:
+            for chunk in all_chunks:
                 chunk.metadata.update(metadata)
 
-        if all(isinstance(node, Chunk) for node in data):
-            await self.vector_store.a_add(data, self.collection_name)
-        else:
-            raise ValueError(
-                "Data returned from pipeline must be a list of Chunk objects"
-            )
+        # Add all chunks to vector store at once (only if we have chunks)
+        if all_chunks:
+            await self.vector_store.a_add(all_chunks, self.collection_name)
 
     def from_yaml(self, config_path: str) -> "IngestionPipeline":
         """
