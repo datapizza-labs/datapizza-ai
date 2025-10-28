@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-azure-openai"
-version = "0.0.3"
+version = "0.0.4"
 description = "Azure OpenAI client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0,<0.1.0",
+    "datapizza-ai-core>=0.0.7,<0.1.0",
     "datapizza-ai-clients-openai>=0.0.1",
     "openai>=1.63.2,<2.0.0",
 ]
