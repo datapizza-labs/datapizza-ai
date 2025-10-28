@@ -239,8 +239,12 @@ class MistralClient(Client):
         stop_reason = None
         for chunk in response:
             usage += TokenUsage(
-                prompt_tokens=chunk.data.usage.prompt_tokens or 0,
-                completion_tokens=chunk.data.usage.completion_tokens or 0,
+                prompt_tokens=chunk.data.usage.prompt_tokens
+                if chunk.data.usage
+                else 0 or 0,
+                completion_tokens=chunk.data.usage.completion_tokens
+                if chunk.data.usage
+                else 0 or 0,
                 cached_tokens=0,
             )
             stop_reason = chunk.data.choices[0].finish_reason
@@ -292,8 +296,12 @@ class MistralClient(Client):
         stop_reason = None
         async for chunk in response:
             usage += TokenUsage(
-                prompt_tokens=chunk.data.usage.prompt_tokens or 0,
-                completion_tokens=chunk.data.usage.completion_tokens or 0,
+                prompt_tokens=chunk.data.usage.prompt_tokens
+                if chunk.data.usage
+                else 0 or 0,
+                completion_tokens=chunk.data.usage.completion_tokens
+                if chunk.data.usage
+                else 0 or 0,
                 cached_tokens=0,
             )
             stop_reason = chunk.data.choices[0].finish_reason

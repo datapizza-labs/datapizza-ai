@@ -232,12 +232,14 @@ class OpenAILikeClient(Client):
 
         for chunk in response:
             usage += TokenUsage(
-                prompt_tokens=chunk.usage.prompt_tokens or 0,
-                completion_tokens=chunk.usage.completion_tokens or 0,
-                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens or 0,
+                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
+                completion_tokens=chunk.usage.completion_tokens
+                if chunk.usage
+                else 0 or 0,
+                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
+                if chunk.usage
+                else 0 or 0,
             )
-            delta = chunk.choices[0].delta.content or ""
-            message_content += delta
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
@@ -292,13 +294,14 @@ class OpenAILikeClient(Client):
 
         async for chunk in await a_client.chat.completions.create(**kwargs):
             usage += TokenUsage(
-                prompt_tokens=chunk.usage.prompt_tokens or 0,
-                completion_tokens=chunk.usage.completion_tokens or 0,
-                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens or 0,
+                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
+                completion_tokens=chunk.usage.completion_tokens
+                if chunk.usage
+                else 0 or 0,
+                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
+                if chunk.usage
+                else 0 or 0,
             )
-            delta = chunk.choices[0].delta.content or ""
-            message_content += delta
-            finish_reason = chunk.choices[0].finish_reason
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
