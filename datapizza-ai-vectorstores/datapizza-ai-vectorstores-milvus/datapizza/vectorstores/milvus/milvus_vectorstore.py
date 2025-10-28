@@ -1,21 +1,21 @@
 import logging
 from collections.abc import Generator
-from typing import Any, Optional
+from typing import Any
 
-from datapizza.core.vectorstore import Vectorstore, VectorConfig
+from datapizza.core.vectorstore import VectorConfig, Vectorstore
 from datapizza.type import (
     Chunk,
-    Embedding,
     DenseEmbedding,
-    SparseEmbedding,
+    Embedding,
     EmbeddingFormat,
+    SparseEmbedding,
 )
 from pymilvus import (
+    AsyncMilvusClient,
     CollectionSchema,
     DataType,
     FieldSchema,
     MilvusClient,
-    AsyncMilvusClient,
     MilvusException,
 )
 from pymilvus.milvus_client.index import IndexParams
@@ -29,16 +29,16 @@ class MilvusVectorstore(Vectorstore):
     """
 
     def __init__(
-            self,
-            # You can pass either `uri="http://localhost:19530"` | "./milvus.db" (Milvus Lite)
-            # or host/port(+secure/user/password) via **connection_args for flexibility.
-            uri: Optional[str] = None,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            user: Optional[str] = None,
-            password: Optional[str] = None,
-            secure: Optional[bool] = None,
-            **connection_args: Any,
+        self,
+        # You can pass either `uri="http://localhost:19530"` | "./milvus.db" (Milvus Lite)
+        # or host/port(+secure/user/password) via **connection_args for flexibility.
+        uri: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        secure: bool | None = None,
+        **connection_args: Any,
     ):
         self.conn_kwargs: dict[str, Any] = {}
         if uri:
@@ -60,14 +60,6 @@ class MilvusVectorstore(Vectorstore):
         self.a_client: AsyncMilvusClient
         self.batch_size: int = 100
 
-    DEFAULT_MILVUS_CONNECTION = {
-        "host": "localhost",
-        "port": "19530",
-        "user": "",
-        "password": "",
-        "secure": False,
-    }
-
     def get_client(self) -> MilvusClient:
         if not hasattr(self, "client"):
             self._init_client()
@@ -79,19 +71,17 @@ class MilvusVectorstore(Vectorstore):
         return self.a_client
 
     def _init_client(self):
-        self.client = MilvusClient(
-            **self.conn_kwargs
-        )
+        self.client = MilvusClient(**self.conn_kwargs)
 
     def _init_a_client(self):
-        self.a_client = AsyncMilvusClient(
-            **self.conn_kwargs
-        )
+        self.a_client = AsyncMilvusClient(**self.conn_kwargs)
 
     @staticmethod
     def _chunk_to_row(chunk: Chunk) -> dict[str, Any]:
         def _sparse_to_dict(se: SparseEmbedding) -> dict[int, float]:
-            return {int(i): float(v) for i, v in zip(se.indices, se.values)}
+            return {
+                int(i): float(v) for i, v in zip(se.indices, se.values, strict=False)
+            }
 
         if not chunk.embeddings:
             raise ValueError("Chunk must have an embedding")
@@ -140,15 +130,19 @@ class MilvusVectorstore(Vectorstore):
                 continue
 
             if isinstance(val, list) and all(isinstance(x, float) for x in val):
-                embeddings.append(DenseEmbedding(name=key, vector=[x for x in val]))
+                embeddings.append(DenseEmbedding(name=key, vector=list(val)))
                 continue
 
             if isinstance(val, dict) and val:
                 try:
-                    items = sorted(((int(k), float(v)) for k, v in val.items()), key=lambda t: t[0])
+                    items = sorted(
+                        ((int(k), float(v)) for k, v in val.items()), key=lambda t: t[0]
+                    )
                     indices = [i for i, _ in items]
                     values = [v for _, v in items]
-                    embeddings.append(SparseEmbedding(name=key, indices=indices, values=values))
+                    embeddings.append(
+                        SparseEmbedding(name=key, indices=indices, values=values)
+                    )
                     continue
                 except Exception:
                     # fall through to metadata if it isn't a proper sparse map
@@ -173,16 +167,22 @@ class MilvusVectorstore(Vectorstore):
         return "L2"
 
     @staticmethod
-    def _sparse_embedding_to_milvus_format(sparse_emb: SparseEmbedding) -> dict[int, float]:
+    def _sparse_embedding_to_milvus_format(
+        sparse_emb: SparseEmbedding,
+    ) -> dict[int, float]:
         """
         Convert a SparseEmbedding instance to a Milvus-supported sparse vector format (dict).
 
         Milvus accepts: {dimension_index: value, ...}
         """
-        return {i: v for i, v in zip(sparse_emb.indices, sparse_emb.values)}
+        return dict(zip(sparse_emb.indices, sparse_emb.values, strict=False))
 
-    def add(self, chunk: Chunk | list[Chunk], collection_name: str | None = None, batch_size: int = 100):
-
+    def add(
+        self,
+        chunk: Chunk | list[Chunk],
+        collection_name: str | None = None,
+        batch_size: int = 100,
+    ):
         client = self.get_client()
 
         chunks = chunk if isinstance(chunk, list) else [chunk]
@@ -190,7 +190,7 @@ class MilvusVectorstore(Vectorstore):
 
         try:
             for i in range(0, total, batch_size):
-                batch = chunks[i:i + batch_size]
+                batch = chunks[i : i + batch_size]
                 rows = [self._chunk_to_row(c) for c in batch]
                 client.insert(collection_name=collection_name, data=rows)
 
@@ -198,7 +198,12 @@ class MilvusVectorstore(Vectorstore):
             log.error(f"Failed to batch insert into '{collection_name}': {e!s}")
             raise
 
-    async def a_add(self, chunk: Chunk | list[Chunk], collection_name: str | None = None, batch_size: int = 100):
+    async def a_add(
+        self,
+        chunk: Chunk | list[Chunk],
+        collection_name: str | None = None,
+        batch_size: int = 100,
+    ):
         client = self._get_a_client()
 
         chunks = chunk if isinstance(chunk, list) else [chunk]
@@ -206,7 +211,7 @@ class MilvusVectorstore(Vectorstore):
 
         try:
             for i in range(0, total, batch_size):
-                batch = chunks[i:i + batch_size]
+                batch = chunks[i : i + batch_size]
                 rows = [self._chunk_to_row(c) for c in batch]
                 await client.insert(collection_name=collection_name, data=rows)
 
@@ -215,10 +220,10 @@ class MilvusVectorstore(Vectorstore):
             raise
 
     def retrieve(
-            self,
-            collection_name: str,
-            ids: list[str],
-            **kwargs,
+        self,
+        collection_name: str,
+        ids: list[str],
+        **kwargs,
     ) -> list[Chunk]:
         """
         Retrieve chunks from a collection by their IDs.
@@ -251,17 +256,17 @@ class MilvusVectorstore(Vectorstore):
 
     def update(self, collection_name: str, chunk: Chunk | list[Chunk], **kwargs):
         """
-            Upsert one or more Chunk objects into a Milvus collection.
+        Upsert one or more Chunk objects into a Milvus collection.
 
-            In Milvus, an upsert operation combines both insert and update behavior:
-              - If an entity with the same primary key already exists in the collection,
-                it will be overwritten with the new data.
-              - If the primary key does not exist, a new entity will be inserted.
+        In Milvus, an upsert operation combines both insert and update behavior:
+          - If an entity with the same primary key already exists in the collection,
+            it will be overwritten with the new data.
+          - If the primary key does not exist, a new entity will be inserted.
 
-            Args:
-                collection_name (str): Name of the Milvus collection.
-                chunk (Chunk | list[Chunk]): One or more Chunk objects to upsert.
-                **kwargs: Additional parameters passed to the Milvus client.
+        Args:
+            collection_name (str): Name of the Milvus collection.
+            chunk (Chunk | list[Chunk]): One or more Chunk objects to upsert.
+            **kwargs: Additional parameters passed to the Milvus client.
 
         """
         client = self.get_client()
@@ -275,19 +280,25 @@ class MilvusVectorstore(Vectorstore):
         required = ["id", "text"]
         if user_fields is None:
             return required[:]
-        if not isinstance(user_fields, list) or not all(isinstance(f, str) for f in user_fields):
+        if not isinstance(user_fields, list) or not all(
+            isinstance(f, str) for f in user_fields
+        ):
             raise TypeError("output_fields must be a list[str]")
         # ensure required fields are included
         return required[:] + [f for f in user_fields if f not in required]
 
     @staticmethod
     def _is_multi_query(vec) -> bool:
-        return isinstance(vec, list) and vec and isinstance(vec[0], (list, DenseEmbedding, SparseEmbedding))
+        return (
+            isinstance(vec, list)
+            and vec
+            and isinstance(vec[0], (list, DenseEmbedding, SparseEmbedding))
+        )
 
     def _normalize_query(
-            self,
-            v: list[float] | DenseEmbedding | SparseEmbedding,
-            vector_name: str | None,
+        self,
+        v: list[float] | DenseEmbedding | SparseEmbedding,
+        vector_name: str | None,
     ) -> tuple[list[float] | dict[int, float], str | None]:
         if isinstance(v, (DenseEmbedding, SparseEmbedding)) and not vector_name:
             vector_name = v.name
@@ -296,25 +307,31 @@ class MilvusVectorstore(Vectorstore):
         if isinstance(v, DenseEmbedding):
             return v.vector, vector_name
         if not isinstance(v, list) or (v and not isinstance(v[0], (int, float))):
-            raise TypeError("query_vector must be list[float], DenseEmbedding, or SparseEmbedding")
+            raise TypeError(
+                "query_vector must be list[float], DenseEmbedding, or SparseEmbedding"
+            )
         return v, vector_name
 
     def _prepare_search_args(
-            self,
-            *,
-            query_vector: list[float] | DenseEmbedding | SparseEmbedding,
-            vector_name: str | None,
-            k: int,
-            kwargs: dict,
+        self,
+        *,
+        query_vector: list[float] | DenseEmbedding | SparseEmbedding,
+        vector_name: str | None,
+        k: int,
+        kwargs: dict,
     ) -> dict:
         # guard against accidental multi-vector input
         if self._is_multi_query(query_vector):
-            raise TypeError("Single-vector search only: got a list of vectors. Pass exactly one vector.")
+            raise TypeError(
+                "Single-vector search only: got a list of vectors. Pass exactly one vector."
+            )
 
         # normalize
         vector, vector_name = self._normalize_query(query_vector, vector_name)
         if not vector_name:
-            raise ValueError("vector_name must be provided (or embedded in the Embedding.name).")
+            raise ValueError(
+                "vector_name must be provided (or embedded in the Embedding.name)."
+            )
 
         # fields
         user_fields = kwargs.pop("output_fields", None)
@@ -341,12 +358,12 @@ class MilvusVectorstore(Vectorstore):
         return out
 
     def search(
-            self,
-            collection_name: str,
-            query_vector: list[float] | DenseEmbedding | SparseEmbedding,
-            k: int = 10,
-            vector_name: str | None = None,
-            **kwargs,
+        self,
+        collection_name: str,
+        query_vector: list[float] | DenseEmbedding | SparseEmbedding,
+        k: int = 10,
+        vector_name: str | None = None,
+        **kwargs,
     ) -> list[Chunk]:
         """
         Perform a single-vector similarity search on a Milvus collection.
@@ -378,12 +395,12 @@ class MilvusVectorstore(Vectorstore):
     # ---------- async API ----------
 
     async def a_search(
-            self,
-            collection_name: str,
-            query_vector: list[float] | DenseEmbedding | SparseEmbedding,
-            k: int = 10,
-            vector_name: str | None = None,
-            **kwargs,
+        self,
+        collection_name: str,
+        query_vector: list[float] | DenseEmbedding | SparseEmbedding,
+        k: int = 10,
+        vector_name: str | None = None,
+        **kwargs,
     ) -> list[Chunk]:
         """
         Perform an asynchronous single-vector similarity search on a Milvus collection.
@@ -417,7 +434,11 @@ class MilvusVectorstore(Vectorstore):
         return client.list_collections()
 
     def create_collection(
-            self, collection_name: str, vector_config: list[VectorConfig], index_params: IndexParams = None, **kwargs
+        self,
+        collection_name: str,
+        vector_config: list[VectorConfig],
+        index_params: IndexParams = None,
+        **kwargs,
     ):
         """
         Create a collection with:
@@ -429,14 +450,16 @@ class MilvusVectorstore(Vectorstore):
 
         client = self.get_client()
         if client.has_collection(collection_name):
-            log.warning(f"Collection {collection_name} already exists, skipping creation")
+            log.warning(
+                f"Collection {collection_name} already exists, skipping creation"
+            )
             return
-
-        single = len(vector_config) == 1
 
         fields: list[FieldSchema] = [
             # Fixed 36-char UUIDv4 string (includes hyphens), used as primary key
-            FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=36),
+            FieldSchema(
+                name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=36
+            ),
             FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
         ]
 
@@ -446,15 +469,28 @@ class MilvusVectorstore(Vectorstore):
             if cfg.format == EmbeddingFormat.DENSE:
                 fname = cfg.name
                 if fname in vector_names:
-                    raise ValueError("Each VectorConfig must have a unique 'name' for multi-vector collections")
+                    raise ValueError(
+                        "Each VectorConfig must have a unique 'name' for multi-vector collections"
+                    )
                 vector_names.add(fname)
-                fields.append(FieldSchema(name=fname, dtype=DataType.FLOAT_VECTOR, dim=cfg.dimensions))
+                fields.append(
+                    FieldSchema(
+                        name=fname, dtype=DataType.FLOAT_VECTOR, dim=cfg.dimensions
+                    )
+                )
             elif cfg.format == EmbeddingFormat.SPARSE:
                 fname = cfg.name
                 if fname in vector_names:
-                    raise ValueError("Each VectorConfig must have a unique 'name' for multi-vector collections")
+                    raise ValueError(
+                        "Each VectorConfig must have a unique 'name' for multi-vector collections"
+                    )
                 vector_names.add(fname)
-                fields.append(FieldSchema(name=fname, dtype=DataType.SPARSE_FLOAT_VECTOR, ))
+                fields.append(
+                    FieldSchema(
+                        name=fname,
+                        dtype=DataType.SPARSE_FLOAT_VECTOR,
+                    )
+                )
             else:
                 raise ValueError(f"Unsupported embedding format: {cfg.format}")
 
@@ -497,7 +533,8 @@ class MilvusVectorstore(Vectorstore):
         client.create_collection(
             collection_name=collection_name,
             schema=schema,
-            index_params=idx_params, **kwargs
+            index_params=idx_params,
+            **kwargs,
         )
         # load the collection by default
         client.load_collection(collection_name)
@@ -508,9 +545,9 @@ class MilvusVectorstore(Vectorstore):
             client.drop_collection(collection_name, **kwargs)
 
     def dump_collection(
-            self,
-            collection_name: str,
-            page_size: int = 100,
+        self,
+        collection_name: str,
+        page_size: int = 100,
     ) -> Generator[Chunk, None, None]:
         """
         Iterate all rows via offset paging.

@@ -1,17 +1,17 @@
-import os
+import contextlib
 import uuid
+
 import pytest
+from datapizza.core.vectorstore import VectorConfig
+from datapizza.type import (
+    Chunk,
+    EmbeddingFormat,
+    SparseEmbedding,
+)
 
 from datapizza.vectorstores.milvus import MilvusVectorstore
 
-from datapizza.type import (
-    Chunk,
-    SparseEmbedding,
-    EmbeddingFormat,
-)
-from datapizza.core.vectorstore import VectorConfig
-
-MILVUS_URI = os.getenv("MILVUS_URI", "http://localhost:19530")
+MILVUS_URI = "./milvus.db"
 
 
 def unique_coll(prefix="itest"):
@@ -66,10 +66,8 @@ def collection(store, vector_cfg):
     )
     yield name
     # Cleanup
-    try:
+    with contextlib.suppress(Exception):
         store.delete_collection(name)
-    except Exception:
-        pass
 
 
 def test_metric_from_config_sparse_cosine(store, vector_cfg):
@@ -138,7 +136,8 @@ def test_search_single_sparse(store, collection):
     res = store.search(collection, q, k=3)
     assert isinstance(res, list)
     assert len(res) == 3
-    from datapizza.type import Chunk as _C  # noqa
+    from datapizza.type import Chunk as _C
+
     assert all(isinstance(c, _C) for c in res)
 
 

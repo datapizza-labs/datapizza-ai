@@ -1,25 +1,17 @@
- # MilvusVectorstore
+# Milvus
 
 
 
 ```bash
-
 pip install datapizza-ai-vectorstores-milvus
-
 ```
 
-
-
-<!-- prettier-ignore -->
-
+<!-- prettier-ignore
 ::: datapizza.vectorstores.milvus.MilvusVectorstore
-
     options:
-
         show_source: false
 
-
-
+ -->
 
 
 ## Usage
@@ -42,27 +34,21 @@ vectorstore = MilvusVectorstore(uri="./milvus.db")  # Milvus Lite
 ```
 
 ## Features
+
 - Connect via `host/port` or a single `uri` (supports Milvus Server, Zilliz Cloud, and Milvus Lite).
-
 - Works with **dense** and **sparse** embeddings in the *same* collection.
-
 - Named vector fields for **multi-vector** collections.
-
 - Batch/async operations: `add` / `a_add`, `search` / `a_search`.
-
 - Collection management: `create_collection`, `delete_collection`, `get_collections`.
-
 - Entities ops: `retrieve`, `update` (upsert), `remove`.
-
 - Flexible indexing (defaults provided; accepts custom `IndexParams`).
-
 - Dynamic metadata via Milvus’ `$meta` (stored from `Chunk.metadata`).
 
 ---
 
 ## Examples
 
-### 1) Basic Setup & Collection Creation
+### Basic Setup & Collection Creation
 
 ```python
 import uuid
@@ -94,11 +80,10 @@ vectorstore.create_collection(
 
 
 
-### 2) Add Chunks & Search
+### Add Chunks & Search
 
 ```python
 from datapizza.type import Chunk, DenseEmbedding
-
 
 chunks = [
     Chunk(
@@ -133,7 +118,7 @@ for chunk in results:
 
 
 
-### 3) Retrieve, Update (Upsert), Remove
+### Retrieve, Update (Upsert), Remove
 
 ```python
 # Suppose you kept an id from earlier
@@ -143,9 +128,6 @@ target_id = chunks[0].id
 found = vectorstore.retrieve(collection_name="documents", ids=[target_id])
 print("Retrieved:", found[0].text)
 
-
-
-# Update / Upsert
 updated = Chunk(
     id=target_id,
     text="First document content (updated)",
@@ -155,28 +137,20 @@ updated = Chunk(
 
 vectorstore.update(collection_name="documents", chunk=updated)
 
-# Remove
 vectorstore.remove(collection_name="documents", ids=[target_id])
 
 ```
 
 
 
-### 4) Async API
+### Async API
 
 ```python
-
 import asyncio
-
 from datapizza.type import DenseEmbedding
 
-
-
 async def main():
-    
     vs = MilvusVectorstore(uri="./milvus.db")
-
-    # Async add
     more = [
         Chunk(
             id=str(uuid.uuid4()),
@@ -184,32 +158,21 @@ async def main():
             embeddings=[DenseEmbedding(name="text_embeddings", vector=[0.2, 0.1, 0.9])]
         )
     ]
-
     await vs.a_add(more, collection_name="documents")
 
-    # Async search
     hits = await vs.a_search(
         collection_name="documents",
         query_vector=DenseEmbedding(name="text_embeddings", vector=[0.2, 0.1, 0.9]),
         k=3,
     )
-
     print([h.text for h in hits])
 
-
-
 asyncio.run(main())
-
 ```
 
-
-
-### 5) Multi-Vector (Dense + Sparse)
-
-
+### Multi-Vector (Dense + Sparse)
 
 ```python
-
 from datapizza.core.vectorstore import VectorConfig
 from datapizza.type import Chunk, DenseEmbedding, SparseEmbedding, EmbeddingFormat
 from datapizza.vectorstores.milvus import MilvusVectorstore
@@ -255,10 +218,6 @@ vectorstore.create_collection(
     index_params=index_params  # index params created earlier
 )
 
-
-
-# Insert a hybrid chunk
-
 hybrid = Chunk(
     id=str(uuid.uuid4()),
     text="Hybrid vector example",
@@ -271,71 +230,25 @@ hybrid = Chunk(
 
 vectorstore.add(hybrid, collection_name="hybrid_docs")
 
-
-
 # Dense search
-
 vectorstore.search(
     collection_name="hybrid_docs",
     query_vector=DenseEmbedding(name="dense_vector", vector=[0.01]*1024),
     k=5,
 )
 
-
-
 # Sparse search
-
 vectorstore.search(
     collection_name="hybrid_docs",
     query_vector=SparseEmbedding(name="sparse_vector", indices=[1,7], values=[1.0,0.6]),
     k=5,
 )
-
 ```
 
 
-### 6) Dump a Collection (Pagination Helper
+### Dump a Collection (Pagination Helper
 
 ```python
-
 for chunk in vectorstore.dump_collection("documents", page_size=100):
-
     print(chunk.id, chunk.text, chunk.metadata)
-
 ```
-
----
-
-## API Notes
-
-- **Primary schema:** Every collection has `id` (primary, `VARCHAR(36)`), `text` (`VARCHAR`), plus your vector fields. Arbitrary `metadata` on `Chunk` is stored via Milvus **dynamic fields** into `$meta`.
-
-- **Distance mapping:** `Distance.COSINE → COSINE`, otherwise `L2`. Sparse vectors use **IP** under the hood.
-
-- **Search inputs:** Pass a raw list for dense vectors *and* the `vector_name`, or pass a `DenseEmbedding`/`SparseEmbedding` whose `.name` matches the vector field to avoid specifying `vector_name`.
-
-- **Upsert vs Insert:** `update()` performs an **upsert**; existing primary keys are overwritten, new ones are inserted.
-
-- **Batching:** `add(..., batch_size=100)` inserts in chunks; adjust for your workload.
-
----
-
-
-
-## Troubleshooting
-
-- **“vector_name must be provided”**  
-
-  Provide `vector_name="..."` or pass a `DenseEmbedding/SparseEmbedding` with `.name` set to the vector field.
-
-- **“Unsupported embedding type”**  
-
-  Only `DenseEmbedding` and `SparseEmbedding` are supported.
-
-- **Collection already exists**  
-
-  `create_collection` is idempotent; it logs and returns if the name already exists.
-
----
-
-                    

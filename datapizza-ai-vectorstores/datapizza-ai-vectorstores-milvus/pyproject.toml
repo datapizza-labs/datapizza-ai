@@ -11,7 +11,7 @@ description = "Milvus vectorstore for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
 
-requires-python = ">=3.10.0,<4" 
+requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.0.0",
-    "pymilvus>=2.5.4"
+    "pymilvus>=2.5.4",
 ]
 
 # Development dependencies

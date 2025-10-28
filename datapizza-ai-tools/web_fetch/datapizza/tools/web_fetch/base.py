@@ -1,5 +1,3 @@
-from typing import Optional
-
 import httpx
 
 from datapizza.tools import Tool
@@ -15,7 +13,7 @@ class WebFetchTool(Tool):
     DEFAULT_TIMEOUT = 10.0
     DEFAULT_USER_AGENT = "DataPizza-AI-Tool/1.0"
 
-    def __init__(self, timeout: Optional[float] = None, user_agent: Optional[str] = None):
+    def __init__(self, timeout: float | None = None, user_agent: str | None = None):
         """Initializes the WebFetchTool.
 
         Args:
@@ -28,7 +26,9 @@ class WebFetchTool(Tool):
             func=self.__call__,
         )
         self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
-        self.user_agent = user_agent if user_agent is not None else self.DEFAULT_USER_AGENT
+        self.user_agent = (
+            user_agent if user_agent is not None else self.DEFAULT_USER_AGENT
+        )
 
     def __call__(self, url: str) -> str:
         """Invoke the tool."""
@@ -51,8 +51,12 @@ class WebFetchTool(Tool):
             elif status_code in (401, 403):
                 return f"Error: Not authorized to access {url_str!r} ({status_code})."
             elif 400 <= status_code < 500:
-                return f"Error: Client error {status_code} while requesting {url_str!r}."
+                return (
+                    f"Error: Client error {status_code} while requesting {url_str!r}."
+                )
             elif 500 <= status_code < 600:
-                return f"Error: Server error {status_code} while requesting {url_str!r}."
+                return (
+                    f"Error: Server error {status_code} while requesting {url_str!r}."
+                )
             else:
                 return f"Error response {status_code} while requesting {url_str!r}."
