@@ -1,9 +1,8 @@
-from datapizza.vectorstores.qdrant import QdrantVectorstore
-
 from datapizza.core.models import PipelineComponent
 from datapizza.core.vectorstore import VectorConfig
 from datapizza.pipeline import IngestionPipeline
 from datapizza.type import Chunk, DenseEmbedding, Node
+from datapizza.vectorstores.qdrant import QdrantVectorstore
 
 
 class CustomSplitter(PipelineComponent):
@@ -130,7 +129,7 @@ def test_ingestion_pipeline_with_multiple_files():
     # Test with list of strings
     pipeline.run(
         ["Primo documento", "Secondo documento", "Terzo documento"],
-        metadata={"batch": "test"}
+        metadata={"batch": "test"},
     )
 
     data = qdrant_client.search(
@@ -153,7 +152,7 @@ def test_ingestion_pipeline_list_validation():
     # Should raise ValueError for non-string elements
     try:
         pipeline.run([123, "valid_string", None])
-        assert False, "Should have raised ValueError"
+        raise AssertionError("Should have raised ValueError")
     except ValueError as e:
         assert "must be strings" in str(e).lower()
 
