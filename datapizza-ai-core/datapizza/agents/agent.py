@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 from datapizza.agents.logger import AgentLogger
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
+from datapizza.core.utils import sum_token_usage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.tracing.tracing import agent_span, tool_span
@@ -31,9 +33,11 @@ class StepResult:
         self,
         index: int,
         content: list[Block],
+        usage: TokenUsage | None = None,
     ):
         self.index = index
         self.content = content
+        self.usage = usage or TokenUsage()
 
     @property
     def text(self) -> str:
@@ -420,6 +424,7 @@ class Agent:
     ) -> Generator[StepResult | ClientResponse, None, None]:
         """Execute a planning step with streaming support."""
         tool_results = []
+        step_usage = TokenUsage()
 
         # Check if streaming is enabled
         response: ClientResponse
@@ -431,6 +436,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             ):
+                step_usage += chunk.usage
                 response = chunk
                 if chunk.delta:
                     yield chunk
@@ -444,6 +450,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             )
+            step_usage += response.usage
 
         if not response:
             raise RuntimeError("No response from client")
@@ -467,6 +474,7 @@ class Agent:
         step_action = StepResult(
             index=current_step,
             content=response.content + tool_results,
+            usage=response.usage,
         )
 
         yield step_action
@@ -476,7 +484,7 @@ class Agent:
     ) -> AsyncGenerator[StepResult | ClientResponse, None]:
         """Execute a planning step with streaming support."""
         tool_results = []
-
+        step_usage = TokenUsage()
         # Check if streaming is enabled
         response: ClientResponse
         if self._stream:
@@ -487,6 +495,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             ):
+                step_usage += chunk.usage
                 response = chunk
                 if chunk.delta:
                     yield chunk
@@ -500,6 +509,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             )
+            step_usage += response.usage
 
         if planning_prompt:
             memory.add_turn(TextBlock(content=planning_prompt), role=ROLE.USER)
@@ -520,6 +530,7 @@ class Agent:
         step_action = StepResult(
             index=current_step,
             content=response.content + tool_results,
+            usage=response.usage,
         )
 
         yield step_action
@@ -592,10 +603,20 @@ class Agent:
             The final result of the agent's execution
         """
         with agent_span(f"Agent {self.name}"):
-            return cast(
-                StepResult,
-                list(self._invoke_stream(task_input, tool_choice, **gen_kwargs))[-1],
+            usage = TokenUsage()
+            steps = list[ClientResponse | StepResult | Plan | None](
+                self._invoke_stream(task_input, tool_choice, **gen_kwargs)
             )
+            usage += sum_token_usage(
+                [step.usage for step in steps if isinstance(step, StepResult)]
+            )
+
+            last_step = cast(
+                StepResult,
+                steps[-1],
+            )
+            last_step.usage = usage
+            return last_step
 
     @_lock_if_not_stateless
     async def a_run(
@@ -617,9 +638,17 @@ class Agent:
             The final result of the agent's execution
         """
         with agent_span(f"Agent {self.name}"):
+            total_usage = TokenUsage()
             results = []
             async for result in self._a_invoke_stream(
                 task_input, tool_choice, **gen_kwargs
             ):
                 results.append(result)
-            return results[-1] if results else None
+
+            total_usage += sum_token_usage(
+                [result.usage for result in results if isinstance(result, StepResult)]
+            )
+            last_result = results[-1] if results else None
+            if last_result:
+                last_result.usage = total_usage
+            return last_result
