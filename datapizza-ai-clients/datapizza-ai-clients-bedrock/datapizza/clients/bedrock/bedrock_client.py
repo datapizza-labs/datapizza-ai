@@ -7,6 +7,7 @@ import boto3
 from botocore.config import Config
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import FunctionCallBlock, TextBlock
@@ -102,9 +103,7 @@ class BedrockClient(Client):
             # Priority: explicit credentials > profile > default credentials
             if self.aws_access_key_id and self.aws_secret_access_key:
                 session_kwargs["aws_access_key_id"] = self.aws_access_key_id
-                session_kwargs["aws_secret_access_key"] = (
-                    self.aws_secret_access_key
-                )
+                session_kwargs["aws_secret_access_key"] = self.aws_secret_access_key
                 if self.aws_session_token:
                     session_kwargs["aws_session_token"] = self.aws_session_token
             elif self.profile_name:
@@ -203,9 +202,11 @@ class BedrockClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=prompt_tokens,
-            completion_tokens_used=completion_tokens,
-            cached_tokens_used=0,  # Bedrock doesn't expose cache metrics in the same way
+            usage=TokenUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cached_tokens=0,  # Bedrock doesn't expose cache metrics in the same way
+            ),
         )
 
     def _invoke(
@@ -286,9 +287,7 @@ class BedrockClient(Client):
         messages = self._memory_to_contents(None, input, memory)
 
         # Remove model role messages (Bedrock doesn't support this)
-        messages = [
-            message for message in messages if message.get("role") != "model"
-        ]
+        messages = [message for message in messages if message.get("role") != "model"]
 
         tool_map = {tool.name: tool for tool in tools}
 
@@ -393,9 +392,6 @@ class BedrockClient(Client):
                             content=[TextBlock(content=message_text)],
                             delta=text_delta,
                             stop_reason=None,
-                            prompt_tokens_used=0,
-                            completion_tokens_used=0,
-                            cached_tokens_used=0,
                         )
 
                 elif "metadata" in event:
@@ -412,9 +408,11 @@ class BedrockClient(Client):
             content=[TextBlock(content=message_text)],
             delta="",
             stop_reason=stop_reason,
-            prompt_tokens_used=input_tokens,
-            completion_tokens_used=output_tokens,
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                cached_tokens=0,
+            ),
         )
 
     async def _a_stream_invoke(
@@ -439,9 +437,7 @@ class BedrockClient(Client):
         messages = self._memory_to_contents(None, input, memory)
 
         # Remove model role messages
-        messages = [
-            message for message in messages if message.get("role") != "model"
-        ]
+        messages = [message for message in messages if message.get("role") != "model"]
 
         # Build the request body
         request_body = {
@@ -492,9 +488,6 @@ class BedrockClient(Client):
                                 content=[TextBlock(content=message_text)],
                                 delta=text_delta,
                                 stop_reason=None,
-                                prompt_tokens_used=0,
-                                completion_tokens_used=0,
-                                cached_tokens_used=0,
                             )
 
                     elif "metadata" in event:
@@ -511,9 +504,11 @@ class BedrockClient(Client):
                 content=[TextBlock(content=message_text)],
                 delta="",
                 stop_reason=stop_reason,
-                prompt_tokens_used=input_tokens,
-                completion_tokens_used=output_tokens,
-                cached_tokens_used=0,
+                usage=TokenUsage(
+                    prompt_tokens=input_tokens,
+                    completion_tokens=output_tokens,
+                    cached_tokens=0,
+                ),
             )
 
     def _structured_response(

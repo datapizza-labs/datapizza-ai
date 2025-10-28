@@ -5,6 +5,7 @@ from typing import Literal
 import httpx
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
@@ -140,9 +141,11 @@ class OpenAIClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=prompt_tokens or 0,
-            completion_tokens_used=completion_tokens or 0,
-            cached_tokens_used=cached_tokens or 0,
+            usage=TokenUsage(
+                prompt_tokens=prompt_tokens or 0,
+                completion_tokens=completion_tokens or 0,
+                cached_tokens=cached_tokens or 0,
+            ),
         )
 
     def _convert_tools(self, tool: Tool) -> dict:
@@ -284,9 +287,11 @@ class OpenAIClient(Client):
                     content=[],
                     delta=chunk.delta,
                     stop_reason=None,
-                    prompt_tokens_used=0,
-                    completion_tokens_used=0,
-                    cached_tokens_used=0,
+                    usage=TokenUsage(
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_tokens=0,
+                    ),
                 )
 
             if isinstance(chunk, ResponseCompletedEvent):
@@ -331,9 +336,11 @@ class OpenAIClient(Client):
                     content=[],
                     delta=chunk.delta,
                     stop_reason=None,
-                    prompt_tokens_used=0,
-                    completion_tokens_used=0,
-                    cached_tokens_used=0,
+                    usage=TokenUsage(
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_tokens=0,
+                    ),
                 )
 
             if isinstance(chunk, ResponseCompletedEvent):
