@@ -24,6 +24,7 @@ class RedisMemory(Memory):
         expiration_time=3600,
         force_new_index: bool = False,
         index_name: str = "idx:history",
+            **redis_conf_kwargs
     ):
         """
         A Redis-based memory implementation that extends the original Memory class.
@@ -37,8 +38,9 @@ class RedisMemory(Memory):
         :param expiration_time: the messages TTL
         :param force_new_index: whether to force a new index
         :param index_name: the name of the index
+        :param redis_conf_kwargs: additional Redis configuration parameters passed as keyword arguments.
         """
-        self.redis = redis.Redis(host=host, port=port, db=db,decode_responses=True)
+        self.redis = redis.Redis(host=host, port=port, db=db, decode_responses=True, **redis_conf_kwargs)
 
         self.expiration_time = expiration_time
         self.user_id = user_id
