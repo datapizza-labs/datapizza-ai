@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.0",
+    "datapizza-ai-core>=0.0.6,<0.1.0",
     "pymilvus>=2.5.4",
 ]
 
