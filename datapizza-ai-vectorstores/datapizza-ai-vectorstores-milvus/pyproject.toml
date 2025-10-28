@@ -1,0 +1,58 @@
+# Build system configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Project metadata
+[project]
+name = "datapizza-ai-vectorstores-milvus"
+version = "0.0.1"
+description = "Milvus vectorstore for the datapizza-ai framework"
+readme = "README.md"
+license = {text = "MIT"}
+
+requires-python = ">=3.10.0,<4"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+    "datapizza-ai-core>=0.0.6,<0.1.0",
+    "pymilvus>=2.5.4",
+]
+
+# Development dependencies
+[dependency-groups]
+dev = [
+    "deptry>=0.23.0",
+    "pytest",
+    "ruff>=0.11.5",
+]
+
+# Hatch build configuration
+[tool.hatch.build.targets.sdist]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
+
+[tool.hatch.build.targets.wheel]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
+
+# Ruff configuration
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    # "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "I",   # isort
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # Ruff-specific rules
+    "C4",  # flake8-comprehensions
+]

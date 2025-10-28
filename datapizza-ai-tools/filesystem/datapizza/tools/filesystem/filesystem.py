@@ -23,7 +23,7 @@ def string_matches_patterns(string_to_check: str, patterns: list[str]) -> bool:
     if len(patterns) == 0:
         return True
 
-    return any([_check_pattern(string_to_check, pattern) for pattern in patterns])
+    return any(_check_pattern(string_to_check, pattern) for pattern in patterns)
 
 
 class FileSystem:
@@ -48,12 +48,12 @@ class FileSystem:
         self.include_patterns = paths_to_include if paths_to_include else ["*"]
         self.exclude_patterns = paths_to_exclude if paths_to_exclude else []
 
-    def is_path_valid(self, path: str) -> str:
+    def is_path_valid(self, path: str) -> bool:
         if string_matches_patterns(path, self.include_patterns):
-            if self.exclude_patterns:
-                if string_matches_patterns(path, self.exclude_patterns):
-                    return False
-            return True
+            return not (
+                self.exclude_patterns
+                and string_matches_patterns(path, self.exclude_patterns)
+            )
         return False
 
     @tool
