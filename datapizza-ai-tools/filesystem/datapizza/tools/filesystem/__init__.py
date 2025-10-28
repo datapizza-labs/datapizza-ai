@@ -1,3 +1,3 @@
-from .filesystem import FileSystem
+from .filesystem import FileSystem, string_matches_patterns
 
-__all__ = ["FileSystem"]
+__all__ = ["FileSystem", "string_matches_patterns"]

@@ -1,8 +1,9 @@
 import logging
 from typing import Literal
 
+from datapizza.core.clients import ClientResponse
 from datapizza.core.clients.client import Client
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory.memory import Memory, Turn
 from datapizza.memory.memory_adapter import MemoryAdapter
 from datapizza.tools.tools import Tool
@@ -111,16 +112,20 @@ class MockClient(Client):
 
             return ClientResponse(
                 content=[TextBlock(content=text)],
-                prompt_tokens_used=len(input_text),
-                completion_tokens_used=len(text),
-                cached_tokens_used=0,
+                usage=TokenUsage(
+                    prompt_tokens=len(input_text),
+                    completion_tokens=len(text),
+                    cached_tokens=0,
+                ),
             )
 
         return ClientResponse(
             content=[TextBlock(content=input_text)],
-            prompt_tokens_used=len(input_text),
-            completion_tokens_used=len(input_text),
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=len(input_text),
+                completion_tokens=len(input_text),
+                cached_tokens=0,
+            ),
         )
 
     async def _a_invoke(

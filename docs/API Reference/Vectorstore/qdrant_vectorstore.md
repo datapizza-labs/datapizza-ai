@@ -1,4 +1,4 @@
-# QdrantVectorstore
+# Qdrant
 
 ```python
 pip install datapizza-ai-vectorstores-qdrant

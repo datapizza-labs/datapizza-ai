@@ -1,6 +1,6 @@
 import httpx
 import pytest
-from httpx import Response, Request
+from httpx import Request
 
 from datapizza.tools.web_fetch import WebFetchTool
 
@@ -26,7 +26,9 @@ def test_web_fetch_tool_success(tool, httpx_mock):
 def test_web_fetch_tool_timeout(tool, httpx_mock):
     """Test the tool's timeout handling."""
     url = "https://example.com/timeout"
-    httpx_mock.add_exception(httpx.TimeoutException("Timeout!", request=Request("GET", url)))
+    httpx_mock.add_exception(
+        httpx.TimeoutException("Timeout!", request=Request("GET", url))
+    )
 
     result = tool(url)
 
@@ -56,7 +58,9 @@ def test_web_fetch_tool_server_error(tool, httpx_mock):
 def test_web_fetch_tool_request_error(tool, httpx_mock):
     """Test a generic request error."""
     url = "https://example.com/request-error"
-    httpx_mock.add_exception(httpx.RequestError("Some error", request=Request("GET", url)))
+    httpx_mock.add_exception(
+        httpx.RequestError("Some error", request=Request("GET", url))
+    )
 
     result = tool(url)
 

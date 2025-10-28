@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-bedrock"
-version = "0.0.3"
+version = "0.0.4"
 description = "AWS Bedrock client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1,<0.1.0",
+    "datapizza-ai-core>=0.0.7,<0.1.0",
     "boto3>=1.35.0",
     "botocore>=1.35.0",
     "aioboto3>=13.0.0",

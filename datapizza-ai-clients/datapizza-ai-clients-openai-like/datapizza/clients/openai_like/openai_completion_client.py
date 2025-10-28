@@ -5,6 +5,7 @@ from typing import Literal
 import httpx
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools.tools import Tool
 from datapizza.type import (
@@ -97,11 +98,11 @@ class OpenAILikeClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=response.choices[0].finish_reason,
-            prompt_tokens_used=response.usage.prompt_tokens,
-            completion_tokens_used=response.usage.completion_tokens,
-            cached_tokens_used=response.usage.prompt_tokens_details.cached_tokens
-            if response.usage.prompt_tokens_details
-            else 0,
+            usage=TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens or 0,
+                completion_tokens=response.usage.completion_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
+            ),
         )
 
     def _convert_tools(self, tools: Tool) -> dict:
@@ -226,9 +227,19 @@ class OpenAILikeClient(Client):
 
         response = self.client.chat.completions.create(**kwargs)
         message_content = ""
+        usage = TokenUsage()
+        finish_reason = None
+
         for chunk in response:
-            delta = None
-            finish_reason = None
+            usage += TokenUsage(
+                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
+                completion_tokens=chunk.usage.completion_tokens
+                if chunk.usage
+                else 0 or 0,
+                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
+                if chunk.usage
+                else 0 or 0,
+            )
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
@@ -240,17 +251,12 @@ class OpenAILikeClient(Client):
                 content=[TextBlock(content=message_content)],
                 delta=delta_content,
                 stop_reason=finish_reason or None,
-                prompt_tokens_used=chunk.usage.prompt_tokens
-                if hasattr(chunk.usage, "prompt_tokens")
-                else 0,
-                completion_tokens_used=chunk.usage.completion_tokens
-                if hasattr(chunk.usage, "completion_tokens")
-                else 0,
-                cached_tokens_used=chunk.usage.prompt_tokens_details.cached_tokens
-                if hasattr(chunk.usage, "prompt_tokens_details")
-                and chunk.usage.prompt_tokens_details
-                else 0,
             )
+        yield ClientResponse(
+            content=[TextBlock(content=message_content)],
+            stop_reason=finish_reason or None,
+            usage=usage,
+        )
 
     async def _a_stream_invoke(
         self,
@@ -283,10 +289,19 @@ class OpenAILikeClient(Client):
 
         a_client = self._get_a_client()
         message_content = ""
+        usage = TokenUsage()
+        finish_reason = None
 
         async for chunk in await a_client.chat.completions.create(**kwargs):
-            delta = None
-            finish_reason = None
+            usage += TokenUsage(
+                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
+                completion_tokens=chunk.usage.completion_tokens
+                if chunk.usage
+                else 0 or 0,
+                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
+                if chunk.usage
+                else 0 or 0,
+            )
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
@@ -299,17 +314,12 @@ class OpenAILikeClient(Client):
                 content=[TextBlock(content=message_content)],
                 delta=delta_content,
                 stop_reason=finish_reason or None,
-                prompt_tokens_used=chunk.usage.prompt_tokens
-                if hasattr(chunk.usage, "prompt_tokens")
-                else 0,
-                completion_tokens_used=chunk.usage.completion_tokens
-                if hasattr(chunk.usage, "completion_tokens")
-                else 0,
-                cached_tokens_used=chunk.usage.prompt_tokens_details.cached_tokens
-                if hasattr(chunk.usage, "prompt_tokens_details")
-                and chunk.usage.prompt_tokens_details
-                else 0,
             )
+        yield ClientResponse(
+            content=[TextBlock(content=message_content)],
+            stop_reason=finish_reason or None,
+            usage=usage,
+        )
 
     def _structured_response(
         self,
@@ -360,18 +370,10 @@ class OpenAILikeClient(Client):
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            prompt_tokens_used=(response.usage.prompt_tokens if response.usage else 0),
-            completion_tokens_used=(
-                response.usage.completion_tokens if response.usage else 0
-            ),
-            cached_tokens_used=(
-                response.usage.prompt_tokens_details.cached_tokens
-                if response.usage
-                and hasattr(response.usage, "prompt_tokens_details")
-                and response.usage.prompt_tokens_details
-                and hasattr(response.usage.prompt_tokens_details, "cached_tokens")
-                and response.usage.prompt_tokens_details.cached_tokens is not None
-                else 0
+            usage=TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens or 0,
+                completion_tokens=response.usage.completion_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
             ),
         )
 
@@ -420,9 +422,9 @@ class OpenAILikeClient(Client):
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            prompt_tokens_used=response.usage.prompt_tokens,
-            completion_tokens_used=response.usage.completion_tokens,
-            cached_tokens_used=response.usage.prompt_tokens_details.cached_tokens
-            if response.usage.prompt_tokens_details
-            else 0,
+            usage=TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens or 0,
+                completion_tokens=response.usage.completion_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
+            ),
         )

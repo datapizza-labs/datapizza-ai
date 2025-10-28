@@ -5,24 +5,22 @@ build-backend = "hatchling.build"
 
 # Project metadata
 [project]
-name = "datapizza-ai-clients-openai-like"
-version = "0.0.7"
-description = "OpenAI client for the datapizza-ai framework"
+name = "datapizza-ai-vectorstores-milvus"
+version = "0.0.1"
+description = "Milvus vectorstore for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [
-    {name = "Datapizza", email = "datapizza@datapizza.tech"}
-]
+
 requires-python = ">=3.10.0,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.7,<0.1.0",
-    "httpx>=0.28.1",
-    "openai>=2.0.0,<3.0.0",
+    "datapizza-ai-core>=0.0.6,<0.1.0",
+    "pymilvus>=2.5.4",
 ]
 
 # Development dependencies
