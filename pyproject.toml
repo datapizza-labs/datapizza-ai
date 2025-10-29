@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai"
-version = "0.0.2"
+version = "0.0.7"
 description = "Build reliable Gen AI solutions without overhead"
 readme = "README.md"
 license = {text = "MIT"}
