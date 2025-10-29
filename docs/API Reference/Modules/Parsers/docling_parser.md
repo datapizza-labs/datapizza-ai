@@ -179,19 +179,3 @@ ocr_config = OCROptions(
 - `"auto"` - Automatic detection
 
 For a complete list of supported languages, refer to [Tesseract documentation](https://github.com/UB-Mannheim/tesseract/wiki).
-
-### Backward Compatibility
-
-The parser maintains backward compatibility with the deprecated `pdf_path` parameter:
-
-```python
-from datapizza.modules.parsers.docling import DoclingParser
-import warnings
-
-parser = DoclingParser()
-
-# This still works but issues a DeprecationWarning
-with warnings.catch_warnings(record=True) as w:
-    warnings.simplefilter("always")
-    document = parser.parse(pdf_path="document.pdf")  # Use file_path instead
-```
