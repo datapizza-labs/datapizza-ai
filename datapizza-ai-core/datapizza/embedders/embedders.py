@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Generator
 
+import requests
 from datapizza.core.clients import Client
 from datapizza.core.embedder import BaseEmbedder
 from datapizza.core.models import PipelineComponent
