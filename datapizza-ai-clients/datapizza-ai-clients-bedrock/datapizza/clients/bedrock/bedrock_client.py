@@ -2,10 +2,12 @@ import os
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
+import aioboto3
 import boto3
 from botocore.config import Config
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import FunctionCallBlock, TextBlock
@@ -94,10 +96,32 @@ class BedrockClient(Client):
             )
 
     def _set_a_client(self):
-        # For async, we'll use the same client for now
-        # boto3 doesn't have native async support, but we can use aioboto3 if needed
+        """Initialize async bedrock-runtime client using aioboto3"""
         if not self.a_client:
-            self.a_client = self.client
+            session_kwargs = {}
+
+            # Priority: explicit credentials > profile > default credentials
+            if self.aws_access_key_id and self.aws_secret_access_key:
+                session_kwargs["aws_access_key_id"] = self.aws_access_key_id
+                session_kwargs["aws_secret_access_key"] = self.aws_secret_access_key
+                if self.aws_session_token:
+                    session_kwargs["aws_session_token"] = self.aws_session_token
+            elif self.profile_name:
+                session_kwargs["profile_name"] = self.profile_name
+
+            # Create async session
+            session = aioboto3.Session(**session_kwargs)
+
+            # Create bedrock-runtime client with retry configuration
+            config = Config(
+                retries={"max_attempts": 3, "mode": "adaptive"},
+                read_timeout=300,
+            )
+
+            # Store the session and config for async client creation
+            self.a_session = session
+            self.a_config = config
+            self.a_region_name = self.region_name
 
     def _convert_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
         """Convert tools to Bedrock tool format (similar to Anthropic)"""
@@ -178,9 +202,11 @@ class BedrockClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=prompt_tokens,
-            completion_tokens_used=completion_tokens,
-            cached_tokens_used=0,  # Bedrock doesn't expose cache metrics in the same way
+            usage=TokenUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cached_tokens=0,  # Bedrock doesn't expose cache metrics in the same way
+            ),
         )
 
     def _invoke(
@@ -250,11 +276,56 @@ class BedrockClient(Client):
         system_prompt: str | None,
         **kwargs,
     ) -> ClientResponse:
-        """Async implementation - currently wraps sync call
+        """Async implementation using aioboto3"""
+        if tools is None:
+            tools = []
 
-        Note: For true async support, consider using aioboto3
-        """
-        raise NotImplementedError("Async support for Bedrock is not yet implemented")
+        # Ensure async client is initialized
+        if not hasattr(self, "a_session"):
+            self._set_a_client()
+
+        messages = self._memory_to_contents(None, input, memory)
+
+        # Remove model role messages (Bedrock doesn't support this)
+        messages = [message for message in messages if message.get("role") != "model"]
+
+        tool_map = {tool.name: tool for tool in tools}
+
+        # Build the request body according to Bedrock Converse API
+        request_body = {
+            "modelId": self.model_name,
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": max_tokens or 2048,
+            },
+        }
+
+        if temperature is not None:
+            request_body["inferenceConfig"]["temperature"] = temperature
+
+        # Add system prompt if provided
+        if system_prompt:
+            request_body["system"] = [{"text": system_prompt}]
+
+        # Add tools if provided
+        if tools:
+            request_body["toolConfig"] = {
+                "tools": self._convert_tools(tools),
+                "toolChoice": self._convert_tool_choice(tool_choice),
+            }
+
+        # Add any additional kwargs
+        request_body.update(kwargs)
+
+        # Call Bedrock Converse API asynchronously
+        async with self.a_session.client(
+            service_name="bedrock-runtime",
+            region_name=self.a_region_name,
+            config=self.a_config,
+        ) as client:
+            response = await client.converse(**request_body)
+
+        return self._response_to_client_response(response, tool_map)
 
     def _stream_invoke(
         self,
@@ -321,9 +392,6 @@ class BedrockClient(Client):
                             content=[TextBlock(content=message_text)],
                             delta=text_delta,
                             stop_reason=None,
-                            prompt_tokens_used=0,
-                            completion_tokens_used=0,
-                            cached_tokens_used=0,
                         )
 
                 elif "metadata" in event:
@@ -340,24 +408,108 @@ class BedrockClient(Client):
             content=[TextBlock(content=message_text)],
             delta="",
             stop_reason=stop_reason,
-            prompt_tokens_used=input_tokens,
-            completion_tokens_used=output_tokens,
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                cached_tokens=0,
+            ),
         )
 
     async def _a_stream_invoke(
         self,
         input: str,
-        tools: list[Tool] | None = None,
-        memory: Memory | None = None,
-        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-        system_prompt: str | None = None,
+        tools: list[Tool] | None,
+        memory: Memory | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        temperature: float | None,
+        max_tokens: int,
+        system_prompt: str | None,
         **kwargs,
     ) -> AsyncIterator[ClientResponse]:
-        """Async streaming - currently wraps sync implementation"""
-        raise NotImplementedError("Async support for Bedrock is not yet implemented")
+        """Async streaming implementation using aioboto3"""
+        if tools is None:
+            tools = []
+
+        # Ensure async client is initialized
+        if not hasattr(self, "a_session"):
+            self._set_a_client()
+
+        messages = self._memory_to_contents(None, input, memory)
+
+        # Remove model role messages
+        messages = [message for message in messages if message.get("role") != "model"]
+
+        # Build the request body
+        request_body = {
+            "modelId": self.model_name,
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": max_tokens or 2048,
+            },
+        }
+
+        if temperature is not None:
+            request_body["inferenceConfig"]["temperature"] = temperature
+
+        if system_prompt:
+            request_body["system"] = [{"text": system_prompt}]
+
+        if tools:
+            request_body["toolConfig"] = {
+                "tools": self._convert_tools(tools),
+                "toolChoice": self._convert_tool_choice(tool_choice),
+            }
+
+        request_body.update(kwargs)
+
+        # Call Bedrock ConverseStream API asynchronously
+        async with self.a_session.client(
+            service_name="bedrock-runtime",
+            region_name=self.a_region_name,
+            config=self.a_config,
+        ) as client:
+            response = await client.converse_stream(**request_body)
+
+            # Process streaming response
+            message_text = ""
+            input_tokens = 0
+            output_tokens = 0
+            stop_reason = None
+
+            stream = response.get("stream")
+            if stream:
+                async for event in stream:
+                    if "contentBlockDelta" in event:
+                        delta = event["contentBlockDelta"].get("delta", {})
+                        if "text" in delta:
+                            text_delta = delta["text"]
+                            message_text += text_delta
+                            yield ClientResponse(
+                                content=[TextBlock(content=message_text)],
+                                delta=text_delta,
+                                stop_reason=None,
+                            )
+
+                    elif "metadata" in event:
+                        metadata = event["metadata"]
+                        usage = metadata.get("usage", {})
+                        input_tokens = usage.get("inputTokens", 0)
+                        output_tokens = usage.get("outputTokens", 0)
+
+                    elif "messageStop" in event:
+                        stop_reason = event["messageStop"].get("stopReason")
+
+            # Final response with complete information
+            yield ClientResponse(
+                content=[TextBlock(content=message_text)],
+                delta="",
+                stop_reason=stop_reason,
+                usage=TokenUsage(
+                    prompt_tokens=input_tokens,
+                    completion_tokens=output_tokens,
+                    cached_tokens=0,
+                ),
+            )
 
     def _structured_response(
         self,

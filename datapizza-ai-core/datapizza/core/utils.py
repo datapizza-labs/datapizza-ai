@@ -7,6 +7,8 @@ from typing import Any
 
 from typing_extensions import override
 
+from datapizza.core.clients.models import TokenUsage
+
 # logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -56,6 +58,10 @@ def _basic_config(logger: logging.Logger) -> None:
     logger.setLevel(logging.DEBUG)
     logger.addHandler(console_handler)
     logger.propagate = False
+
+
+def sum_token_usage(usages: list[TokenUsage]) -> TokenUsage:
+    return sum(usages, TokenUsage())
 
 
 class EnvLogLevelFilter(logging.Filter):

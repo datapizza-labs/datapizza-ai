@@ -122,29 +122,13 @@ class QdrantVectorstore(Vectorstore):
             raise ValueError("Chunk must have an embedding")
 
         vector = {}
-        if len(chunk.embeddings) == 1:
-            if isinstance(chunk.embeddings[0], DenseEmbedding):
-                vector = chunk.embeddings[0].vector
-            elif isinstance(chunk.embeddings[0], SparseEmbedding):
-                vector = models.SparseVector(
-                    values=chunk.embeddings[0].values,
-                    indices=chunk.embeddings[0].indices,
-                )
+        for v in chunk.embeddings:
+            if isinstance(v, DenseEmbedding):
+                vector[v.name] = v.vector
+            elif isinstance(v, SparseEmbedding):
+                vector[v.name] = models.SparseVector(values=v.values, indices=v.indices)
             else:
-                raise ValueError(
-                    f"Unsupported embedding type: {type(chunk.embeddings[0])}"
-                )
-
-        else:
-            for v in chunk.embeddings:
-                if isinstance(v, DenseEmbedding):
-                    vector[v.name] = v.vector
-                elif isinstance(v, SparseEmbedding):
-                    vector[v.name] = models.SparseVector(
-                        values=v.values, indices=v.indices
-                    )
-                else:
-                    raise ValueError(f"Unsupported embedding type: {type(v)}")
+                raise ValueError(f"Unsupported embedding type: {type(v)}")
 
         return models.PointStruct(
             id=str(chunk.id),
@@ -201,7 +185,7 @@ class QdrantVectorstore(Vectorstore):
     def search(
         self,
         collection_name: str,
-        query_vector: list[float],
+        query_vector: list[float] | SparseEmbedding | dict,
         k: int = 10,
         vector_name: str | None = None,
         **kwargs,
@@ -221,7 +205,37 @@ class QdrantVectorstore(Vectorstore):
         """
         client = self.get_client()
 
-        qry = (vector_name, query_vector) if vector_name else query_vector
+        if isinstance(query_vector, list) and all(
+            isinstance(v, float) for v in query_vector
+        ):
+            if not vector_name:
+                vectors_config = list(
+                    client.get_collection(collection_name).config.params.vectors
+                )
+                if vectors_config and len(vectors_config) > 1:
+                    raise ValueError(
+                        f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
+                    )
+                vector_name = str(vectors_config[0])
+            qry = (vector_name, query_vector) if vector_name else query_vector
+
+        elif isinstance(query_vector, dict):
+            indices = query_vector.get("indices", [])
+            values = query_vector.get("values", [])
+            qry = models.NamedSparseVector(
+                name=vector_name or "default",
+                vector=models.SparseVector(indices=indices, values=values),
+            )
+
+        elif isinstance(query_vector, SparseEmbedding):
+            qry = models.NamedSparseVector(
+                name=query_vector.name,
+                vector=models.SparseVector(
+                    indices=query_vector.indices, values=query_vector.values
+                ),
+            )
+        else:
+            raise ValueError(f"Unsupported query vector type: {type(query_vector)}")
 
         hits = client.search(
             collection_name=collection_name,
@@ -281,35 +295,24 @@ class QdrantVectorstore(Vectorstore):
         ) = None
         config = None
         try:
-            if len(vector_config) == 1:
-                if vector_config[0].format == EmbeddingFormat.DENSE:
-                    config = models.VectorParams(
-                        size=vector_config[0].dimensions,
-                        distance=vector_config[0].distance.value,  # type: ignore
-                    )
-                elif vector_config[0].format == EmbeddingFormat.SPARSE:
-                    sparse_config = models.SparseVectorParams()
-
-            else:
-                # Multiple vector configurations
-                config = {
-                    v.name: models.VectorParams(
-                        size=v.dimensions,
-                        distance=v.distance.value,  # type: ignore
-                    )
-                    for v in vector_config
-                    if v.format == EmbeddingFormat.DENSE
-                }
-                sparse_config = {
-                    v.name: models.SparseVectorParams()
-                    for v in vector_config
-                    if v.format == EmbeddingFormat.SPARSE
-                }
+            config = {
+                v.name: models.VectorParams(
+                    size=v.dimensions,  # type: ignore
+                    distance=v.distance.value,  # type: ignore
+                )
+                for v in vector_config
+                if v.format == EmbeddingFormat.DENSE
+            }
+            sparse_config = {
+                v.name: models.SparseVectorParams()
+                for v in vector_config
+                if v.format == EmbeddingFormat.SPARSE
+            }
 
             client.create_collection(
                 collection_name=collection_name,
                 vectors_config=config,
-                sparse_vectors_config=sparse_config,  # type: ignore
+                sparse_vectors_config=sparse_config,
                 **kwargs,
             )
         except Exception as e:

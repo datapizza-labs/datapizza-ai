@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-parsers-docling"
-version = "0.0.5"
+version = "0.0.7"
 description = "Doclign parser for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}

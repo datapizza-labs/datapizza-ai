@@ -9,7 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from datapizza.core.cache import Cache, cacheable
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients.models import ClientResponse
 from datapizza.core.models import ChainableProducer, PipelineComponent
 from datapizza.memory import Memory
 from datapizza.memory.memory_adapter import MemoryAdapter

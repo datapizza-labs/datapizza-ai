@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import FunctionCallBlock, TextBlock, ThoughtBlock
@@ -128,9 +129,11 @@ class AnthropicClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=response.usage.input_tokens,
-            completion_tokens_used=response.usage.output_tokens,
-            cached_tokens_used=response.usage.cache_read_input_tokens,
+            usage=TokenUsage(
+                prompt_tokens=response.usage.input_tokens,
+                completion_tokens=response.usage.output_tokens,
+                cached_tokens=response.usage.cache_read_input_tokens,
+            ),
         )
 
     def _invoke(
@@ -293,9 +296,11 @@ class AnthropicClient(Client):
             ],
             delta="",
             stop_reason="end_turn",
-            prompt_tokens_used=input_tokens,
-            completion_tokens_used=output_tokens,
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                cached_tokens=0,
+            ),
         )
 
     async def _a_stream_invoke(
@@ -376,9 +381,11 @@ class AnthropicClient(Client):
             ],
             delta="",
             stop_reason="end_turn",
-            prompt_tokens_used=input_tokens,
-            completion_tokens_used=output_tokens,
-            cached_tokens_used=0,
+            usage=TokenUsage(
+                prompt_tokens=input_tokens,
+                completion_tokens=output_tokens,
+                cached_tokens=0,
+            ),
         )
 
     def _structured_response(
