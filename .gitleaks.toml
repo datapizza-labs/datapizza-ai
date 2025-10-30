@@ -31,6 +31,18 @@ description = "Generic API Key"
 regex = '''(?i)(api[_-]?key|apikey|access[_-]?key)\s*[=:]\s*['"]?[a-zA-Z0-9\-_]{20,}['"]?'''
 tags = ["key", "generic"]
 
+[[rules]]
+id = "gmail-app-password"
+description = "Gmail App Password (16 lowercase chars)"
+regex = '''password['":\s]*['"]?[a-z]{16}['"]?'''
+tags = ["gmail", "smtp", "password"]
+
+[[rules]]
+id = "smtp-credentials"
+description = "SMTP Password in Config"
+regex = '''(?i)(smtp|email|mail).*password['":\s]*['"]?[a-zA-Z0-9]{12,}['"]?'''
+tags = ["smtp", "email", "password"]
+
 [allowlist]
 description = "Allowlist for safe patterns"
 paths = [
@@ -46,4 +58,7 @@ regexes = [
     '''your_key_here''',
     '''<YOUR_.*>''',
     '''EXAMPLE_KEY''',
+    '''YOUR_16_CHAR_APP_PASSWORD_HERE''',
+    '''xxxx xxxx xxxx xxxx''',
+    '''\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*''',
 ]
