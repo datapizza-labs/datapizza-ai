@@ -14,10 +14,10 @@ from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.tracing.tracing import agent_span, tool_span
 from datapizza.type import (
-    ROLE,
     Block,
     FunctionCallBlock,
     FunctionCallResultBlock,
+    ROLE,
     TextBlock,
 )
 
@@ -41,9 +41,26 @@ class StepResult:
 
     @property
     def text(self) -> str:
-        return "\n".join(
-            block.content for block in self.content if isinstance(block, TextBlock)
-        )
+        tools_end_param = {block.id: block.tool.end_invoke for block in self.tools_used}
+
+        if not len(tools_end_param) or all(
+            [
+                not used_tool_is_end_invoke
+                for _, used_tool_is_end_invoke in tools_end_param.items()
+            ]
+        ):
+            # no tools used, or tools with end=False used.
+            return "\n".join(
+                block.content for block in self.content if isinstance(block, TextBlock)
+            )
+        else:
+
+            return "\n".join(
+                block.result
+                for block in self.content
+                if isinstance(block, FunctionCallResultBlock)
+                and tools_end_param[block.id]
+            )
 
     @property
     def tools_used(self) -> list[FunctionCallBlock]:
@@ -206,8 +223,9 @@ class Agent:
     def stream_invoke(
         self,
         task_input: str,
-        tool_choice: Literal["auto", "required", "none", "required_first"]
-        | list[str] = "auto",
+        tool_choice: (
+            Literal["auto", "required", "none", "required_first"] | list[str]
+        ) = "auto",
         **gen_kwargs,
     ) -> Generator[ClientResponse | StepResult | Plan | None, None]:
         """
@@ -228,8 +246,9 @@ class Agent:
     async def a_stream_invoke(
         self,
         task_input: str,
-        tool_choice: Literal["auto", "required", "none", "required_first"]
-        | list[str] = "auto",
+        tool_choice: (
+            Literal["auto", "required", "none", "required_first"] | list[str]
+        ) = "auto",
         **gen_kwargs,
     ) -> AsyncGenerator[ClientResponse | StepResult | Plan | None]:
         """
@@ -587,8 +606,9 @@ class Agent:
     def run(
         self,
         task_input: str,
-        tool_choice: Literal["auto", "required", "none", "required_first"]
-        | list[str] = "auto",
+        tool_choice: (
+            Literal["auto", "required", "none", "required_first"] | list[str]
+        ) = "auto",
         **gen_kwargs,
     ) -> StepResult | None:
         """
@@ -622,8 +642,9 @@ class Agent:
     async def a_run(
         self,
         task_input: str,
-        tool_choice: Literal["auto", "required", "none", "required_first"]
-        | list[str] = "auto",
+        tool_choice: (
+            Literal["auto", "required", "none", "required_first"] | list[str]
+        ) = "auto",
         **gen_kwargs,
     ) -> StepResult | None:
         """
