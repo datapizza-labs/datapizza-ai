@@ -20,7 +20,7 @@ pip install datapizza-ai-clients-openai
 from datapizza.clients.openai import OpenAIClient
 
 client = OpenAIClient(
-    api_key="YOUR_API_KEY"
+    api_key="YOUR_API_KEY",
     model="gpt-4o-mini",
 )
 response = client.invoke("Hello!")
