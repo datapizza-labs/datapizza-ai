@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mood.webresearch</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/mainenti/datapizza-ai-0.0.2/tools/schedule_research.sh</string>
+    </array>
+    
+    <key>StartCalendarInterval</key>
+    <array>
+        <!-- Lunedì alle 10:00 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>1</integer>
+            <key>Hour</key>
+            <integer>10</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- Mercoledì alle 10:00 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>3</integer>
+            <key>Hour</key>
+            <integer>10</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- Venerdì alle 10:00 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>5</integer>
+            <key>Hour</key>
+            <integer>10</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/mainenti/datapizza-ai-0.0.2/outputs/research/launch_stdout.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/Users/mainenti/datapizza-ai-0.0.2/outputs/research/launch_stderr.log</string>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/mainenti/datapizza-ai-0.0.2</string>
+</dict>
+</plist>
