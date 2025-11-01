@@ -187,20 +187,11 @@ with open("configs/personal_profile.yaml") as f:
         featured_product=mood_product
     )
     
-    # Initialize Google Client
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        st.error("❌ GOOGLE_API_KEY non trovata. Aggiungi a .env file.")
-        st.stop()
-    client = GoogleClient(api_key=api_key, model="gemini-2.0-flash-exp")
-    
-    # Initialize Multi-Agent Team
-    multi_agent = MultiAgentContentTeam(client=client, profile=profile)
-    st.session_state.multi_agent = multi_agent
-    
-    # Initialize MOOD Development Team
-    if 'dev_team' not in st.session_state:
-        st.session_state.dev_team = MOODDevelopmentTeam(client=client)
+    # Initialize Google Client (lazy loading - only when needed)
+    if 'google_client' not in st.session_state:
+        st.session_state.google_client = None
+    if 'multi_agent' not in st.session_state:
+        st.session_state.multi_agent = None
 
 # Load configs
 with open("configs/target_organizations.yaml") as f:
@@ -232,6 +223,36 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Tab Navigation Dropdown
+    st.subheader("� Navigation")
+    
+    tab_options = {
+        "🔍 Hunt Contacts": "tab_hunt",
+        "✉️ Generate & Send Emails": "tab_emails",
+        "📸 Instagram Posts": "tab_instagram",
+        "📊 Dashboard": "tab_dashboard",
+        "🛠️ MOOD Dev Agent": "tab_dev",
+        "🌐 Research Insights": "tab_research",
+        "⚙️ Settings": "tab_settings",
+        "💼 LinkedIn Personal": "tab_linkedin",
+        "🧠 Learning Agent": "tab_learning",
+        "⚡ GitHub Automation": "tab_github",
+        "🎛️ Hardware Projects": "tab_hardware"
+    }
+    
+    current_tab = st.selectbox(
+        "Seleziona Tab",
+        list(tab_options.keys()),
+        key="nav_tab"
+    )
+    
+    # Store current tab in session state
+    if 'current_tab' not in st.session_state:
+        st.session_state.current_tab = "tab_hunt"
+    st.session_state.current_tab = tab_options[current_tab]
+    
+    st.markdown("---")
+    
     # Quick actions
     if st.button("🔄 Run Weekly Update", use_container_width=True):
         st.info("Running weekly update...")
@@ -239,26 +260,26 @@ with st.sidebar:
     if st.button("📊 View Campaign Stats", use_container_width=True):
         st.session_state.page = "stats"
 
-# Main tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
-    "🔍 Hunt Contacts",
-    "✉️ Generate & Send Emails",
-    "📸 Instagram Posts",
-    "📊 Dashboard",
-    "🛠️ MOOD Dev Agent",
-    "🌐 Research Insights",
-    "⚙️ Settings",
-    "💼 LinkedIn Personal",
-    "🧠 Learning Agent",
-    "⚡ GitHub Automation",
-    "🎛️ Hardware Projects"
-])
+# Create tab containers (used for backward compatibility with existing code)
+# The navigation is handled by the dropdown in the sidebar above
+tab1 = st.container()
+tab2 = st.container()
+tab3 = st.container()
+tab4 = st.container()
+tab5 = st.container()
+tab6 = st.container()
+tab7 = st.container()
+tab8 = st.container()
+tab9 = st.container()
+tab10 = st.container()
+tab11 = st.container()
 
 # ============================================================================
 # TAB 1: HUNT CONTACTS
 # ============================================================================
-with tab1:
-    st.header("🔍 Contact Hunter")
+if st.session_state.current_tab == "tab_hunt":
+    with tab1:
+        st.header("🔍 Contact Hunter")
     st.markdown("Cerca automaticamente contatti da siti web di musei/gallerie")
     
     col1, col2 = st.columns([2, 1])
@@ -335,11 +356,59 @@ with tab1:
 # ============================================================================
 # TAB 2: GENERATE & SEND EMAILS
 # ============================================================================
-with tab2:
-    st.header("✉️ Email Generation & Sending")
-    
-    # Get contacts from database
-    all_contacts = db.get_contacts(status="new", min_confidence=0.5)
+if st.session_state.current_tab == "tab_emails":
+    with tab2:
+        st.header("✉️ Email Generation & Sending")
+        
+        # Lazy-load Google Client if needed
+        if st.session_state.multi_agent is None:
+            try:
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    st.error("❌ GOOGLE_API_KEY non trovata. Aggiungi a .env file per usare questa tab.")
+                    st.stop()
+                from datapizza.agents.personal_profile import PersonalProfile, FeaturedProduct
+                from datapizza.clients.google import GoogleClient
+                from datapizza.agents.multi_agent import MultiAgentContentTeam
+                
+                with open("configs/personal_profile.yaml") as f:
+                    profile_data = yaml.safe_load(f)
+                    featured = profile_data.get('featured_product', {})
+                    mood_product = FeaturedProduct(
+                        name=featured.get('name', 'MOOD'),
+                        tagline=featured.get('tagline', ''),
+                        description=featured.get('description', ''),
+                        target_audience=featured.get('target_audience', []),
+                        key_features=featured.get('key_features', []),
+                        benefits=featured.get('benefits', []),
+                        use_cases=featured.get('use_cases', []),
+                        tech_stack=featured.get('tech_stack', ''),
+                        github_url=featured.get('github_url', ''),
+                        cta_primary=featured.get('cta_primary', ''),
+                        cta_secondary=featured.get('cta_secondary', '')
+                    )
+                    personal_info = profile_data.get('personal_info', profile_data)
+                    profile = PersonalProfile(
+                        name=personal_info.get('name', profile_data.get('name', 'Antonio Mainenti')),
+                        title=personal_info.get('title', profile_data.get('title', '')),
+                        about=personal_info.get('about', profile_data.get('about', '')),
+                        services=personal_info.get('services', profile_data.get('services', [])),
+                        offer_default=profile_data.get('offer_default', ''),
+                        email_from=profile_data.get('email_from', ''),
+                        cta_link=profile_data.get('cta_link', ''),
+                        featured_product=mood_product
+                    )
+                
+                client = GoogleClient(api_key=api_key, model="gemini-2.0-flash-exp")
+                multi_agent = MultiAgentContentTeam(client=client, profile=profile)
+                st.session_state.multi_agent = multi_agent
+                st.session_state.google_client = client
+            except Exception as e:
+                st.error(f"❌ Errore inizializzazione Multi-Agent: {e}")
+                st.stop()
+        
+        # Get contacts from database
+        all_contacts = db.get_contacts(status="new", min_confidence=0.5)
     
     if not all_contacts:
         st.info("📭 No contacts available. Use the 'Hunt Contacts' tab to find contacts first!")
@@ -523,8 +592,9 @@ with tab2:
 # ============================================================================
 # TAB 3: INSTAGRAM POSTS
 # ============================================================================
-with tab3:
-    st.header("📸 Instagram Content Generation")
+if st.session_state.current_tab == "tab_instagram":
+    with tab3:
+        st.header("📸 Instagram Content Generation")
     st.markdown("Genera post Instagram per promuovere MOOD a musei e gallerie")
     
     col1, col2 = st.columns([2, 1])
@@ -644,8 +714,9 @@ with tab3:
 # ============================================================================
 # TAB 4: DASHBOARD
 # ============================================================================
-with tab4:
-    st.header("📊 Campaign Dashboard")
+if st.session_state.current_tab == "tab_dashboard":
+    with tab4:
+        st.header("📊 Campaign Dashboard")
     
     # Overall stats
     col1, col2, col3, col4 = st.columns(4)
@@ -679,13 +750,34 @@ with tab4:
 # ============================================================================
 # TAB 5: MOOD DEVELOPER AGENT
 # ============================================================================
-with tab5:
-    st.header("🛠️ MOOD Developer Agent")
+if st.session_state.current_tab == "tab_dev":
+    with tab5:
+        st.header("🛠️ MOOD Developer Agent")
     st.markdown("Automatizza ricerca, progettazione e implementazione di nuove funzionalità per MOOD.")
 
     # Import VS Code Integration
     sys.path.insert(0, str(Path(__file__).parent))
     from vscode_integration import VSCodeProjectGenerator
+    
+    # Lazy init dev_team
+    if 'dev_team' not in st.session_state:
+        try:
+            from mood_dev_agent import MOODDevelopmentTeam
+            from datapizza.clients.google import GoogleClient
+            
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                st.error("⚠️ GOOGLE_API_KEY non trovata. Configura la chiave nel file .env")
+                st.session_state.dev_team = None
+            else:
+                # Usa GoogleClient datapizza (compatibile con MOODDevelopmentTeam)
+                google_client = GoogleClient(api_key=api_key, model="gemini-2.0-flash-exp")
+                st.session_state.dev_team = MOODDevelopmentTeam(client=google_client)
+        except Exception as e:
+            st.error(f"❌ Errore inizializzazione dev_team: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            st.session_state.dev_team = None
 
     action = st.selectbox(
         "Seleziona azione",
@@ -736,102 +828,107 @@ class Example:
     run = st.button("🚀 Esegui", type="primary")
 
     if run:
-        with st.spinner("L'agente sta lavorando..."):
-            try:
-                team = st.session_state.dev_team
-                output_title = action
-                content = ""
+        if not st.session_state.dev_team:
+            st.error("❌ Developer team non inizializzato. Verifica GOOGLE_API_KEY nel file .env")
+        else:
+            with st.spinner("L'agente sta lavorando..."):
+                try:
+                    team = st.session_state.dev_team
+                    output_title = action
+                    content = ""
 
-                if action == "Weekly Innovation Sprint":
-                    result = team.weekly_innovation_sprint()
-                    # Compose markdown report
-                    content = f"""# MOOD Weekly Innovation Sprint\n\nData: {result['sprint_date']}\n\n## 📅 Events Report\n\n{result['events_report']}\n\n## 🔬 Technology Analysis\n\n{result['technology_analysis']}\n\n## 💡 Feature Proposal\n\n{result['feature_proposal']}\n"""
-                elif action == "Monitor Events":
-                    content = team.developer.monitor_events(**params)
-                elif action == "Analyze Technology":
-                    content = team.developer.analyze_technology(**params)
-                elif action == "Propose Feature":
-                    content = team.developer.propose_feature(**params)
-                elif action == "Implement Software Integration":
-                    content = team.implement_software_integration(software=params['software'], protocol=params['protocol'])
-                    output_title = f"Implement {params['software']} ({params['protocol']})"
-                elif action == "Implement Hardware Integration":
-                    content = team.implement_hardware_integration(hardware=params['hardware'])
-                    output_title = f"Hardware {params['hardware']}"
-                elif action == "Create Demo":
-                    content = team.developer.create_demo(**params)
-                elif action == "Code Review":
-                    content = team.developer.code_review(**params)
-                elif action == "Update Documentation":
-                    content = team.developer.update_documentation(**params)
+                    if action == "Weekly Innovation Sprint":
+                        result = team.weekly_innovation_sprint()
+                        # Compose markdown report
+                        content = f"""# MOOD Weekly Innovation Sprint\n\nData: {result['sprint_date']}\n\n## 📅 Events Report\n\n{result['events_report']}\n\n## 🔬 Technology Analysis\n\n{result['technology_analysis']}\n\n## 💡 Feature Proposal\n\n{result['feature_proposal']}\n"""
+                    elif action == "Monitor Events":
+                        content = team.developer.monitor_events(**params)
+                    elif action == "Analyze Technology":
+                        content = team.developer.analyze_technology(**params)
+                    elif action == "Propose Feature":
+                        content = team.developer.propose_feature(**params)
+                    elif action == "Implement Software Integration":
+                        content = team.implement_software_integration(software=params['software'], protocol=params['protocol'])
+                        output_title = f"Implement {params['software']} ({params['protocol']})"
+                    elif action == "Implement Hardware Integration":
+                        content = team.implement_hardware_integration(hardware=params['hardware'])
+                        output_title = f"Hardware {params['hardware']}"
+                    elif action == "Create Demo":
+                        content = team.developer.create_demo(**params)
+                    elif action == "Code Review":
+                        content = team.developer.code_review(**params)
+                    elif action == "Update Documentation":
+                        content = team.developer.update_documentation(**params)
 
-                # Show result
-                st.markdown("### 📄 Output")
-                st.markdown(content)
+                    # Show result
+                    st.markdown("### 📄 Output")
+                    st.markdown(content)
 
-                # Offer save & download
-                ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-                slug = output_title.lower().replace(" ", "-")
-                out_dir = Path("docs/agent_reports")
-                out_dir.mkdir(parents=True, exist_ok=True)
-                file_path = out_dir / f"{ts}_{slug}.md"
-                file_path.write_text(content)
+                    # Offer save & download
+                    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    slug = output_title.lower().replace(" ", "-")
+                    out_dir = Path("docs/agent_reports")
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    file_path = out_dir / f"{ts}_{slug}.md"
+                    file_path.write_text(content)
 
-                st.success(f"✅ Salvato in {file_path}")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.download_button(
-                        label="⬇️ Scarica report",
-                        data=content,
-                        file_name=file_path.name,
-                        mime="text/markdown",
-                    )
-                
-                with col2:
-                    # VS Code Integration
-                    if action in ["Propose Feature", "Implement Software Integration", "Implement Hardware Integration", "Create Demo"]:
-                        if st.button("🚀 Genera Progetto VS Code", type="primary", use_container_width=True):
-                            with st.spinner("Generazione progetto VS Code..."):
-                                try:
-                                    generator = VSCodeProjectGenerator()
-                                    
-                                    # Estrai proposta dal content
-                                    proposal = {
-                                        "title": output_title,
-                                        "feature_description": content[:500],  # Prime 500 char come descrizione
-                                        "target_audience": params.get('target_audience', 'general'),
-                                        "technology": params.get('software', params.get('hardware', 'Python')),
-                                        "priority": "high"
-                                    }
-                                    
-                                    result = generator.generate_project_from_proposal(proposal)
-                                    
-                                    st.success(f"✅ Progetto creato: `{result['project_name']}`")
-                                    st.info(f"📂 Path: `{result['project_path']}`")
-                                    
-                                    st.markdown("### 🎯 Next Steps")
-                                    for step in result['next_steps']:
-                                        st.markdown(f"- {step}")
-                                    
-                                    # Button per aprire in VS Code
-                                    if st.button("📝 Apri in VS Code", use_container_width=True):
-                                        if generator.open_in_vscode(result['project_path']):
-                                            st.success("✅ VS Code aperto!")
-                                        else:
-                                            st.warning("⚠️ Apri manualmente con: `code " + result['project_path'] + "`")
-                                    
-                                except Exception as e:
-                                    st.error(f"❌ Errore generazione progetto: {e}")
-            except Exception as e:
-                st.error(f"❌ Errore: {e}")
+                    st.success(f"✅ Salvato in {file_path}")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.download_button(
+                            label="⬇️ Scarica report",
+                            data=content,
+                            file_name=file_path.name,
+                            mime="text/markdown",
+                        )
+                    
+                    with col2:
+                        # VS Code Integration
+                        if action in ["Propose Feature", "Implement Software Integration", "Implement Hardware Integration", "Create Demo"]:
+                            if st.button("🚀 Genera Progetto VS Code", type="primary", use_container_width=True):
+                                with st.spinner("Generazione progetto VS Code..."):
+                                    try:
+                                        generator = VSCodeProjectGenerator()
+                                        
+                                        # Estrai proposta dal content
+                                        proposal = {
+                                            "title": output_title,
+                                            "feature_description": content[:500],  # Prime 500 char come descrizione
+                                            "target_audience": params.get('target_audience', 'general'),
+                                            "technology": params.get('software', params.get('hardware', 'Python')),
+                                            "priority": "high"
+                                        }
+                                        
+                                        result = generator.generate_project_from_proposal(proposal)
+                                        
+                                        st.success(f"✅ Progetto creato: `{result['project_name']}`")
+                                        st.info(f"📂 Path: `{result['project_path']}`")
+                                        
+                                        st.markdown("### 🎯 Next Steps")
+                                        for step in result['next_steps']:
+                                            st.markdown(f"- {step}")
+                                        
+                                        # Button per aprire in VS Code
+                                        if st.button("📝 Apri in VS Code", use_container_width=True):
+                                            if generator.open_in_vscode(result['project_path']):
+                                                st.success("✅ VS Code aperto!")
+                                            else:
+                                                st.warning("⚠️ Apri manualmente con: `code " + result['project_path'] + "`")
+                                        
+                                    except Exception as e:
+                                        st.error(f"❌ Errore generazione progetto: {e}")
+                    
+                except Exception as e:
+                    st.error(f"❌ Errore esecuzione azione: {e}")
 
 # ============================================================================
-# TAB 6: SETTINGS
+# TAB 7: SETTINGS
 # ============================================================================
-with tab6:
-    st.header("⚙️ Settings")
+if st.session_state.current_tab == "tab_settings":
+    with tab7:
+        st.header("⚙️ Settings")
     
     st.markdown("### 📧 Email Configuration")
     st.code(f"""
@@ -891,10 +988,11 @@ Status: ✅ Configured
         st.info("Running test update...")
 
 # ============================================================================
-# TAB 7: LINKEDIN PERSONAL
+# TAB 8: LINKEDIN PERSONAL
 # ============================================================================
-with tab7:
-    st.header("💼 LinkedIn Personal Content")
+if st.session_state.current_tab == "tab_linkedin":
+    with tab8:
+        st.header("💼 LinkedIn Personal Content")
     st.markdown("""
     Genera contenuti per il tuo profilo LinkedIn personale.  
     Perfetto per **personal branding**, **thought leadership** e **network building**.
@@ -1078,8 +1176,9 @@ with tab7:
 # ============================================================================
 # TAB 6: RESEARCH INSIGHTS
 # ============================================================================
-with tab6:
-    st.header("🌐 Web Research Insights")
+if st.session_state.current_tab == "tab_research":
+    with tab6:
+        st.header("🌐 Web Research Insights")
     st.markdown("""
     Sistema di ricerca automatica che monitora novità tecnologiche **3 volte a settimana** (lunedì, mercoledì, venerdì alle 10:00).
     
@@ -1391,28 +1490,15 @@ with tab6:
         st.info("Assicurati che `tools/web_research_agent.py` sia presente e funzionante.")
 
 # ============================================================================
-# TAB 7: SETTINGS
-# ============================================================================
-with tab7:
-    st.header("⚙️ Settings")
-    st.info("Settings panel - Coming soon")
-
-# ============================================================================
-# TAB 8: LINKEDIN PERSONAL
-# ============================================================================
-with tab8:
-    st.header("💼 LinkedIn Personal")
-    st.info("LinkedIn personal brand panel - Coming soon")
-
-# ============================================================================
 # TAB 9: LEARNING AGENT - Apprendimento Continuo
 # ============================================================================
-with tab9:
-    st.header("🧠 Learning Agent - Autonomia Progressiva")
+if st.session_state.current_tab == "tab_learning":
+    with tab9:
+        st.header("🧠 Learning Agent - Autonomia Progressiva")
     st.markdown("L'agente impara dalle tue decisioni e diventa progressivamente autonomo")
     
     try:
-        from tools.learning_agent import LearningAgent, ActionType, FeedbackType
+        from learning_agent import LearningAgent, ActionType, FeedbackType
         
         # Inizializza Learning Agent
         learning_agent = LearningAgent()
@@ -1513,12 +1599,13 @@ with tab9:
 # ============================================================================
 # TAB 10: GITHUB AUTOMATION - Zero Click PR
 # ============================================================================
-with tab10:
-    st.header("⚡ GitHub Automation - Zero Click PR")
+if st.session_state.current_tab == "tab_github":
+    with tab10:
+        st.header("⚡ GitHub Automation - Zero Click PR")
     st.markdown("Dalla idea al Pull Request completamente automatizzato")
     
     try:
-        from tools.github_automation import GitHubAutomation
+        from github_automation import GitHubAutomation
         from pathlib import Path
         
         col1, col2 = st.columns(2)
@@ -1526,25 +1613,30 @@ with tab10:
         with col1:
             st.subheader("📋 Ultime PR Create")
             
-            # Leggi PR metadata
+            # Leggi PR metadata (sia simulate che reali)
             github_output = Path(__file__).parent.parent / "outputs" / "github"
             if github_output.exists():
                 pr_files = list(github_output.glob("pr_*.json"))
+                pr_sim_files = list(github_output.glob("pr_sim_*.json"))
+                all_pr_files = pr_files + pr_sim_files
                 
-                if pr_files:
+                if all_pr_files:
                     import json
                     
                     pr_list = []
-                    for pr_file in sorted(pr_files, reverse=True)[:5]:
+                    for pr_file in sorted(all_pr_files, reverse=True)[:5]:
                         with open(pr_file, 'r') as f:
                             pr_data = json.load(f)
                             pr_list.append(pr_data)
                     
                     for pr in pr_list:
                         with st.container(border=True):
+                            is_sim = 'pr_sim' in str(pr_file) if 'pr_file' in locals() else 'template' in pr
                             st.markdown(f"**PR #{pr['pr_number']}** - {pr['branch_name']}")
-                            st.markdown(f"🔗 [{pr['pr_url'].split('/')[-1]}]({pr['pr_url']})")
-                            st.code(pr['commit_hash'][:7], language="text")
+                            if is_sim:
+                                st.caption("🧪 Simulazione (dry-run)")
+                            st.markdown(f"🔗 [{pr['pr_url']}]({pr['pr_url']})")
+                            st.code(pr['commit_hash'][:7] if len(pr['commit_hash']) > 7 else pr['commit_hash'], language="text")
                 else:
                     st.info("📊 Nessuna PR creata ancora")
             else:
@@ -1606,12 +1698,25 @@ with tab10:
 # ============================================================================
 # TAB 11: HARDWARE PROJECTS - Raspberry Pi, Jetson, Audio Pro
 # ============================================================================
-with tab11:
-    st.header("🎛️ Hardware Integration - Progetti Specializzati")
+if st.session_state.current_tab == "tab_hardware":
+    with tab11:
+        st.header("🎛️ Hardware Integration - Progetti Specializzati")
     st.markdown("Genera progetti pronti per hardware: Raspberry Pi, NVIDIA Jetson, Audio Professionale")
     
+    st.info("""
+    **📂 Workflow di integrazione con GitHub:**
+    
+    1. **Generazione Progetto**: I progetti vengono salvati in `outputs/hardware/{platform}/{project_name}/`
+    2. **Revisione Locale**: Controlla la struttura, requirements, e setup script generati
+    3. **Copia nel Repository**: Sposta manualmente i file nella root del tuo repository git locale
+    4. **Creazione PR**: Usa **Tab 10 (GitHub Automation)** per creare branch, commit e aprire PR automaticamente
+    
+    ⚠️ **Nota**: Attualmente non c'è integrazione diretta tra questo tab e GitHub Automation. 
+    Futura feature: pulsante "Push to GitHub" per automatizzare l'intero workflow.
+    """)
+    
     try:
-        from tools.hardware_integration import (
+        from hardware_integration import (
             HardwareIntegrationAgent, HardwarePlatform, AudioFramework, SensorType
         )
         
@@ -1656,6 +1761,9 @@ with tab11:
                     
                     st.success("✅ Progetto Raspberry Pi generato!")
                     
+                    output_path = Path(__file__).parent.parent / "outputs" / "hardware" / "raspberry_pi" / project_name
+                    st.info(f"📂 **Percorso salvato:** `{output_path}`")
+                    
                     with st.expander("📁 Struttura Progetto", expanded=True):
                         st.json(config["project"])
                     
@@ -1686,6 +1794,9 @@ with tab11:
                     )
                     
                     st.success("✅ Progetto Jetson generato!")
+                    
+                    output_path = Path(__file__).parent.parent / "outputs" / "hardware" / "jetson" / project_name
+                    st.info(f"📂 **Percorso salvato:** `{output_path}`")
                     
                     with st.expander("📁 Struttura Progetto", expanded=True):
                         st.json(config["project"])

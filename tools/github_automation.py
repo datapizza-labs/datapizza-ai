@@ -13,7 +13,7 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -43,17 +43,62 @@ class GitHubAutomation:
     Automatizza creazione PR da progetti generati.
     """
     
-    def __init__(self, github_config: GitHubConfig = None):
+    def __init__(self, github_config: Optional[GitHubConfig] = None, dry_run: bool = False):
         """
         Inizializza GitHub Automation.
         
         Args:
             github_config: Configurazione GitHub (token, repo, ecc.)
+            dry_run: Se True, abilita funzioni di simulazione senza side-effects
         """
         self.config = github_config
         self.logger = logging.getLogger(__name__)
         self.output_dir = Path(__file__).parent.parent / "outputs" / "github"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.dry_run = dry_run
+
+    def simulate_pr_creation(self, project_name: str, template: str = "Python Project") -> Dict:
+        """
+        Simula la creazione di una PR senza usare git o la rete.
+        Ritorna metadati fittizi utili per test/anteprima.
+        """
+        now = datetime.now()
+        branch_name = f"feature/mood-{project_name.lower().replace(' ', '-')}-{now.strftime('%Y%m%d')}"
+        fake_commit = now.strftime("%Y%m%d%H%M%S")
+        pr_number = int(now.strftime("%H%M%S"))  # numero fittizio
+        
+        # Usa config reale se disponibile, altrimenti carica da .env o usa default
+        if self.config:
+            owner = self.config.repo_owner
+            repo = self.config.repo_name
+        else:
+            try:
+                import os
+                from dotenv import load_dotenv
+                load_dotenv()
+                owner = os.getenv('GITHUB_REPO_OWNER', 'ninuxi')
+                repo = os.getenv('GITHUB_REPO_NAME', 'datapizza-ai')
+            except:
+                owner = 'ninuxi'
+                repo = 'datapizza-ai'
+        
+        pr_url = f"https://github.com/{owner}/{repo}/pull/{pr_number}"
+        meta = {
+            "pr_number": pr_number,
+            "pr_url": pr_url,
+            "branch_name": branch_name,
+            "commit_hash": fake_commit,
+            "created_at": now.isoformat(),
+            "template": template,
+        }
+        # Salva anche un file di log della simulazione per tracciabilità
+        try:
+            sim_file = self.output_dir / f"pr_sim_{now.strftime('%Y%m%d_%H%M%S')}.json"
+            with open(sim_file, 'w') as f:
+                json.dump(meta, f, indent=2)
+        except Exception as e:
+            self.logger.warning(f"Impossibile salvare simulazione PR: {e}")
+        return meta
     
     def load_config_from_env(self) -> GitHubConfig:
         """Carica configurazione da .env"""
@@ -182,7 +227,7 @@ class GitHubAutomation:
         project_name: str,
         branch_name: str,
         implementation_guide: str,
-        templates_used: list = None
+        templates_used: Optional[List[str]] = None
     ) -> Tuple[bool, Optional[PRMetadata]]:
         """
         Crea Pull Request su GitHub usando l'API.
@@ -295,7 +340,7 @@ All code follows Copilot-ready patterns with detailed TODOs for rapid implementa
         project_name: str,
         project_dir: Path,
         implementation_guide: str,
-        templates_used: list = None
+        templates_used: Optional[List[str]] = None
     ) -> Tuple[bool, Optional[PRMetadata]]:
         """
         Pipeline completa: branch -> commit -> push -> PR.
@@ -335,7 +380,7 @@ All code follows Copilot-ready patterns with detailed TODOs for rapid implementa
             implementation_guide,
             templates_used
         )
-        if not success:
+        if not success or metadata is None:
             return False, None
         
         print(f"   ✅ PR: #{metadata.pr_number}")
@@ -366,7 +411,7 @@ All code follows Copilot-ready patterns with detailed TODOs for rapid implementa
 def integrate_with_vscode_generator(
     vscode_project_dir: Path,
     project_name: str,
-    github_config: GitHubConfig = None
+    github_config: Optional[GitHubConfig] = None
 ) -> Tuple[bool, Optional[PRMetadata]]:
     """
     Funzione di integrazione: prendi progetto da VSCodeProjectGenerator
