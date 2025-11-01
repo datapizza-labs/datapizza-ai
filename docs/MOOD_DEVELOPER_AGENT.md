@@ -38,7 +38,7 @@ Il MOOD Developer Agent è integrato nel dashboard web.
 export GOOGLE_API_KEY=your_api_key_here
 
 # Attiva virtual environment
-cd /Users/mainenti/datapizza-ai-0.0.2
+cd /path/to/datapizza-ai
 source .venv/bin/activate
 
 # Rendi eseguibile
@@ -231,8 +231,8 @@ python tools/mood_dev_agent.py weekly-sprint \
 
 **Raccomandazione**: Schedulare con cron ogni domenica:
 ```bash
-# Crontab entry
-0 22 * * 0 cd /Users/mainenti/datapizza-ai-0.0.2 && source .venv/bin/activate && python tools/mood_dev_agent.py weekly-sprint --output reports/sprint-$(date +\%Y\%m\%d).json
+# Crontab entry (sostituisci /path/to/project e /path/to/reports con i tuoi path)
+0 22 * * 0 cd /path/to/project && source .venv/bin/activate && python tools/mood_dev_agent.py weekly-sprint --output /path/to/reports/sprint-$(date +\%Y\%m\%d).json
 ```
 
 ---

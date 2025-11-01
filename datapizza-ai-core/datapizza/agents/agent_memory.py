@@ -206,10 +206,21 @@ class AgentMemory:
         
         # Calcola last 7 days activity
         last_week = datetime.now() - timedelta(days=7)
+        
+        def safe_parse_timestamp(item):
+            """Safely parse timestamp, return None if invalid"""
+            ts = item.get("timestamp", "")
+            if ts:
+                try:
+                    return datetime.fromisoformat(ts)
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
         week_contacts = sum(1 for c in memory.get("contacts_hunted", [])
-                          if c.get("timestamp") and datetime.fromisoformat(c["timestamp"]) > last_week)
+                          if safe_parse_timestamp(c) and safe_parse_timestamp(c) > last_week)
         week_emails = sum(1 for e in memory.get("emails_sent", [])
-                        if e.get("timestamp") and datetime.fromisoformat(e["timestamp"]) > last_week)
+                        if safe_parse_timestamp(e) and safe_parse_timestamp(e) > last_week)
         
         insights = f"""
 LEARNED PATTERNS (Data-Driven Insights):
@@ -247,13 +258,23 @@ Based on these patterns, propose:
         memory = self._load_memory()
         cutoff = datetime.now() - timedelta(days=days)
         
+        def safe_parse_timestamp(item):
+            """Safely parse timestamp, return None if invalid"""
+            ts = item.get("timestamp", "")
+            if ts:
+                try:
+                    return datetime.fromisoformat(ts)
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
         for key in ["contacts_hunted", "emails_generated", "emails_sent", 
                    "instagram_posts_generated", "linkedin_posts_generated",
                    "features_proposed", "technologies_analyzed", "notes"]:
             if key in memory:
                 memory[key] = [
                     item for item in memory[key]
-                    if item.get("timestamp") and datetime.fromisoformat(item["timestamp"]) > cutoff
+                    if safe_parse_timestamp(item) and safe_parse_timestamp(item) > cutoff
                 ]
         
         self._save_memory(memory)
