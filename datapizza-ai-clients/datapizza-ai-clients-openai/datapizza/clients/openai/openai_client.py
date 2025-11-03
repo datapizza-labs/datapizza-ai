@@ -432,8 +432,8 @@ class OpenAIClient(Client):
             kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
             # Structured response needs strict mode and no additional properties
             for tool in kwargs["tools"]:
-                tool["function"]["strict"] = True
-                tool["function"]["parameters"]["additionalProperties"] = False
+                tool["strict"] = True
+                tool["parameters"]["additionalProperties"] = False
 
         response = self.client.responses.parse(**kwargs)
 
@@ -472,8 +472,8 @@ class OpenAIClient(Client):
             kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
             # Structured response needs strict mode and no additional properties
             for tool in kwargs["tools"]:
-                tool["function"]["strict"] = True
-                tool["function"]["parameters"]["additionalProperties"] = False
+                tool["strict"] = True
+                tool["parameters"]["additionalProperties"] = False
 
         a_client = self._get_a_client()
         response = await a_client.responses.parse(**kwargs)
