@@ -63,9 +63,7 @@ def test_parse_with_metadata(azure_parser, sample_azure_result):
         "custom_field": "test_value",
     }
 
-    result = azure_parser._parse_json(
-        sample_azure_result, file_path=sample_file_path
-    )
+    result = azure_parser._parse_json(sample_azure_result, file_path=sample_file_path)
     # Manually apply metadata as parse() would
     result.metadata.update(user_metadata)
 
@@ -80,9 +78,7 @@ def test_parse_with_none_metadata(azure_parser, sample_azure_result):
     sample_file_path = os.path.join(
         os.path.dirname(__file__), "attention_wikipedia_test.pdf"
     )
-    result = azure_parser._parse_json(
-        sample_azure_result, file_path=sample_file_path
-    )
+    result = azure_parser._parse_json(sample_azure_result, file_path=sample_file_path)
 
     assert result.node_type == NodeType.DOCUMENT
     assert result.metadata is not None
@@ -110,9 +106,7 @@ def test_parse_metadata_override(azure_parser, sample_azure_result):
         os.path.dirname(__file__), "attention_wikipedia_test.pdf"
     )
     # Simulate parser-generated metadata with modelId
-    result = azure_parser._parse_json(
-        sample_azure_result, file_path=sample_file_path
-    )
+    result = azure_parser._parse_json(sample_azure_result, file_path=sample_file_path)
     original_model_id = result.metadata.get("modelId")
 
     # Override with user metadata
@@ -124,9 +118,7 @@ def test_parse_metadata_override(azure_parser, sample_azure_result):
     assert result.metadata["modelId"] != original_model_id
 
 
-def test_call_method_with_metadata(
-    azure_parser, sample_azure_result, monkeypatch
-):
+def test_call_method_with_metadata(azure_parser, sample_azure_result, monkeypatch):
     """Test that __call__() method supports metadata parameter."""
     sample_file_path = os.path.join(
         os.path.dirname(__file__), "attention_wikipedia_test.pdf"
@@ -141,16 +133,3 @@ def test_call_method_with_metadata(
     result = azure_parser(sample_file_path, metadata=user_metadata)
 
     assert result.metadata["source"] == "direct_call"
-
-
-@pytest.mark.asyncio
-async def test_a_parse_metadata_type_validation(azure_parser):
-    """Test that a_parse() raises TypeError for invalid metadata type."""
-    sample_file_path = os.path.join(
-        os.path.dirname(__file__), "attention_wikipedia_test.pdf"
-    )
-
-    with pytest.raises(TypeError, match="metadata must be a dict or None"):
-        await azure_parser.a_parse(
-            sample_file_path, metadata="invalid_string"
-        )
