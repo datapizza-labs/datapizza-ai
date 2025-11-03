@@ -370,22 +370,74 @@ class AzureParser(Parser):
             result: AnalyzeResult = await poller.result()
             return result.as_dict()
 
-    def parse(self, file_path: str) -> Node:
+    def parse(self, file_path: str, metadata: dict | None = None) -> Node:
         """
-        Parse a Document with Azure AI Document Intelligence into a Node structure.
+        Parse a Document with Azure AI Document Intelligence into a Node
+        structure.
 
         Args:
             file_path: Path to the document
+            metadata: Optional metadata to be merged into the root document
+                node. Defaults to None.
+
+        Returns:
+            A Node representing the document with hierarchical structure
+
+        Raises:
+            TypeError: If metadata is not a dict or None
+        """
+        # Validate metadata type
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+
+        result_dict = self.parse_with_azure_ai(file_path)
+        document_node = self._parse_json(result_dict, file_path=file_path)
+
+        # Merge provided metadata into the document node's metadata
+        if metadata:
+            document_node.metadata.update(metadata)
+
+        return document_node
+
+    def __call__(self, file_path: str, metadata: dict | None = None) -> Node:
+        """
+        Allow the parser to be called directly as a function.
+
+        Args:
+            file_path: Path to the document
+            metadata: Optional metadata to be merged into the root document node
 
         Returns:
             A Node representing the document with hierarchical structure
         """
-        result_dict = self.parse_with_azure_ai(file_path)
-        return self._parse_json(result_dict, file_path=file_path)
+        return self.parse(file_path, metadata)
 
-    def __call__(self, file_path: str) -> Node:
-        return self.parse(file_path)
+    async def a_parse(
+        self, file_path: str, metadata: dict | None = None
+    ) -> Node:
+        """
+        Async version of parse().
 
-    async def a_parse(self, file_path: str) -> Node:
+        Args:
+            file_path: Path to the document
+            metadata: Optional metadata to be merged into the root document
+                node. Defaults to None.
+
+        Returns:
+            A Node representing the document with hierarchical structure
+
+        Raises:
+            TypeError: If metadata is not a dict or None
+        """
+        # Validate metadata type
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+
         result_dict = await self.a_parse_with_azure_ai(file_path)
-        return self._parse_json(result_dict, file_path=file_path)
+        document_node = self._parse_json(result_dict, file_path=file_path)
+
+        # Merge provided metadata into the document node's metadata
+        if metadata:
+            document_node.metadata.update(metadata)
+
+        return document_node
