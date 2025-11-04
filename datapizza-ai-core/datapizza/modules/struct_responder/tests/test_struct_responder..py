@@ -23,5 +23,5 @@ def test_struct_responder():
     result = pipeline.run({"struct_responder": {"input": "test"}})
     assert result is not None
 
-    print(result.get("struct_responder").structured_data[0])
+    print(result.get("struct_responder").get("structured_data")[0])
 

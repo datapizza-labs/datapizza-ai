@@ -8,7 +8,27 @@ class StructResponder(PipelineComponent):
         self.output_cls = output_cls
 
     def _run(self, *args, **kwargs) -> str:
-        return self.client.structured_response(*args, output_cls=self.output_cls, **kwargs).structured_data[0]
+        response = self.client.structured_response(*args, output_cls=self.output_cls, **kwargs)
+        return {
+            "full_response": response,
+            "structured_data": response.structured_data,
+            "text": response.text,
+            "usage": response.usage,
+            "stop_reason": response.stop_reason,
+            "function_calls": response.function_calls,
+            "thoughts": response.thoughts,
+            "first_text": response.first_text,
+        }
     
     async def _a_run(self, *args, **kwargs) -> str:
-        return (await self.client.a_structured_response(*args, output_cls=self.output_cls, **kwargs)).structured_data[0]
+        response = await self.client.a_structured_response(*args, output_cls=self.output_cls, **kwargs)
+        return {
+            "full_response": response,
+            "structured_data": response.structured_data,
+            "text": response.text,
+            "usage": response.usage,
+            "stop_reason": response.stop_reason,
+            "function_calls": response.function_calls,
+            "thoughts": response.thoughts,
+            "first_text": response.first_text,
+        }
