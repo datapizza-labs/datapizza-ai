@@ -25,3 +25,21 @@ def test_struct_responder():
 
     print(result.get("struct_responder").get("structured_data")[0])
 
+
+
+def test_struct_responder_with_yaml_pipeline():
+
+    yaml_pipeline = """
+    pipeline:
+      - name: struct_responder
+        type: StructResponder
+        module: datapizza.modules.struct_responder
+        params:
+          client: openai
+          output_cls: Profile
+    """
+    pipeline = DagPipeline.from_yaml(yaml_pipeline)
+    result = pipeline.run({"struct_responder": {"input": "test"}})
+    assert result is not None
+
+    print(result.get("struct_responder").get("structured_data")[0])
