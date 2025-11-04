@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datapizza.agents.logger import AgentLogger
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.core.clients.models import TokenUsage
+from datapizza.core.executors.async_executor import AsyncExecutor
 from datapizza.core.utils import sum_token_usage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
@@ -157,8 +158,8 @@ class Agent:
 
     @classmethod
     def _tool_from_agent(cls, agent: "Agent"):
-        def invoke_agent(input_task: str):
-            return cast(StepResult, agent.run(input_task)).text
+        async def invoke_agent(input_task: str):
+            return cast(StepResult, await agent.a_run(input_task)).text
 
         a_tool = Tool(
             func=invoke_agent,
@@ -541,14 +542,8 @@ class Agent:
         with tool_span(f"Tool {function_call.tool.name}"):
             result = function_call.tool(**function_call.arguments)
 
-            # Note: sync version doesn't handle awaitable results
-            # If the tool returns an awaitable, we can't handle it in sync mode
-            if inspect.isawaitable(result):
-                raise RuntimeError(
-                    f"""Cannot run async tool in sync mode.
-                    Tool {function_call.tool.name} returned an awaitable result.
-                    Use async agent methods for async tools or pass sync tools."""
-                )
+            if inspect.iscoroutine(result):
+                result = AsyncExecutor.get_instance().run(result)
 
             if result:
                 self._logger.log_panel(
@@ -568,7 +563,7 @@ class Agent:
         with tool_span(f"Tool {function_call.tool.name}"):
             result = function_call.tool(**function_call.arguments)
 
-            if inspect.isawaitable(result):
+            if inspect.iscoroutine(result):
                 result = await result
 
             if result:

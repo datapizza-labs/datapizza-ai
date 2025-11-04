@@ -1,6 +1,6 @@
 nav:
     - Clients
-    - agent.md
+    - Agents
     - RAG
     - Pipeline
     - Monitoring
