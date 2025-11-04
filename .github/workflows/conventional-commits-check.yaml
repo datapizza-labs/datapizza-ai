@@ -1,0 +1,50 @@
+name: 'Check Conventional Commits format'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  conventional-commits-check:
+    name: Conventional Commits Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Check commits
+        run: |
+          # For pull requests, check only the commits in the PR
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            commits=$(git log --format=%H ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          else
+            # For push events, check only the latest commit
+            commits=$(git log -1 --format=%H)
+          fi
+
+          exit_code=0
+          for commit in $commits; do
+            commit_msg=$(git log -1 --format=%B $commit)
+            echo "Checking commit: $commit"
+            echo "$commit_msg" > .git/COMMIT_EDITMSG
+            if ! PYTHONPATH=. pre-commit run conventional-commits --hook-stage commit-msg --commit-msg-filename .git/COMMIT_EDITMSG; then
+              echo "Commit $commit does not follow conventional commit format"
+              exit_code=1
+            fi
+          done
+
+          exit $exit_code
