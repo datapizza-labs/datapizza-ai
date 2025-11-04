@@ -17,6 +17,8 @@ With MCP, you can build AI agents that:
 
 ## Fetch MCP tools
 
+Here an example of [FastMCP](https://gofastmcp.com/getting-started/welcome) tool provided by FastMCP
+
 ```python
 from datapizza.tools.mcp_client import MCPClient
 
