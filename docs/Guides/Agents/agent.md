@@ -1,4 +1,4 @@
-# Agent
+# Build your first agent
 
 The `Agent` class is the core component for creating autonomous AI agents in Datapizza AI. It handles task execution, tool management, memory, and planning.
 
@@ -29,7 +29,7 @@ print(res.text)
 
 ## Use Tools
 
-The above agent is quite basic, so let's make it more functional by adding [**tools**](../API%20Reference/Type/tool.md).
+The above agent is quite basic, so let's make it more functional by adding [**tools**](../../API%20Reference/Type/tool.md).
 
 ```python
 from datapizza.agents import Agent

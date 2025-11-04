@@ -1,9 +1,11 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import httpx
+from datapizza.core.clients import ClientResponse
+
 from datapizza.clients.openai import (
     OpenAIClient,
 )
-from datapizza.core.clients import ClientResponse
 
 
 def test_client_init():
@@ -12,6 +14,7 @@ def test_client_init():
         api_key="test_api_key",
     )
     assert client is not None
+
 
 @patch("datapizza.clients.openai.openai_client.OpenAI")
 def test_client_init_with_extra_args(mock_openai):
@@ -37,6 +40,7 @@ def test_client_init_with_extra_args(mock_openai):
         http_client=None,
     )
 
+
 @patch("datapizza.clients.openai.openai_client.OpenAI")
 def test_client_init_with_http_client(mock_openai):
     """Tests that a custom http_client is passed to the OpenAI client."""
@@ -59,6 +63,7 @@ def test_client_init_with_http_client(mock_openai):
         http_client=custom_http_client,
     )
 
+
 @patch("datapizza.clients.openai.openai_client.OpenAI")
 def test_invoke_kwargs_override(mock_openai_class):
     """
@@ -69,15 +74,18 @@ def test_invoke_kwargs_override(mock_openai_class):
     mock_openai_instance.responses.create.return_value = MagicMock()
 
     client = OpenAIClient(api_key="test")
-    client._response_to_client_response = MagicMock(return_value=ClientResponse(content=[]))
+    client._response_to_client_response = MagicMock(
+        return_value=ClientResponse(content=[])
+    )
 
     client.invoke("hello", stream=True, top_p=0.5)
 
     mock_openai_instance.responses.create.assert_called_once()
     called_kwargs = mock_openai_instance.responses.create.call_args.kwargs
-    
+
     assert called_kwargs.get("top_p") == 0.5
     assert called_kwargs.get("stream") is False
+
 
 @patch("datapizza.clients.openai.openai_client.OpenAI")
 def test_stream_invoke_kwargs_override(mock_openai_class):
@@ -94,6 +102,6 @@ def test_stream_invoke_kwargs_override(mock_openai_class):
 
     mock_openai_instance.responses.create.assert_called_once()
     called_kwargs = mock_openai_instance.responses.create.call_args.kwargs
-    
+
     assert called_kwargs.get("top_p") == 0.5
     assert called_kwargs.get("stream") is True

@@ -1,0 +1,7 @@
+title: Tools
+nav:
+  - mcp.md
+  - duckduckgo.md
+  - filesystem.md
+  - SQLDatabase.md
+  - web_fetch.md
