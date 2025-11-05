@@ -34,7 +34,7 @@ class ChunkEmbedder(PipelineComponent):
 
     def __init__(
         self,
-        client: Client,
+        client: BaseEmbedder,
         model_name: str | None = None,
         embedding_name: str | None = None,
         batch_size: int = 2047,
