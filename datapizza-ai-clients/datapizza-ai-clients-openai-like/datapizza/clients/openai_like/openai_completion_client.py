@@ -101,7 +101,9 @@ class OpenAILikeClient(Client):
             usage=TokenUsage(
                 prompt_tokens=response.usage.prompt_tokens or 0,
                 completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
+                if response.usage.prompt_tokens_details
+                else 0 or 0,
             ),
         )
 
@@ -236,9 +238,12 @@ class OpenAILikeClient(Client):
                 completion_tokens=chunk.usage.completion_tokens
                 if chunk.usage
                 else 0 or 0,
-                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
-                if chunk.usage
-                else 0 or 0,
+                cached_tokens=getattr(
+                    getattr(chunk.usage, "prompt_tokens_details", None),
+                    "cached_tokens",
+                    0,
+                )
+                or 0,
             )
 
             if len(chunk.choices) > 0:
@@ -298,9 +303,12 @@ class OpenAILikeClient(Client):
                 completion_tokens=chunk.usage.completion_tokens
                 if chunk.usage
                 else 0 or 0,
-                cached_tokens=chunk.usage.prompt_tokens_details.cached_tokens
-                if chunk.usage
-                else 0 or 0,
+                cached_tokens=getattr(
+                    getattr(chunk.usage, "prompt_tokens_details", {}),
+                    "cached_tokens",
+                    0,
+                )
+                or 0,
             )
 
             if len(chunk.choices) > 0:
@@ -373,7 +381,9 @@ class OpenAILikeClient(Client):
             usage=TokenUsage(
                 prompt_tokens=response.usage.prompt_tokens or 0,
                 completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
+                if response.usage.prompt_tokens_details
+                else 0 or 0,
             ),
         )
 
@@ -425,6 +435,8 @@ class OpenAILikeClient(Client):
             usage=TokenUsage(
                 prompt_tokens=response.usage.prompt_tokens or 0,
                 completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens or 0,
+                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
+                if response.usage.prompt_tokens_details
+                else 0 or 0,
             ),
         )

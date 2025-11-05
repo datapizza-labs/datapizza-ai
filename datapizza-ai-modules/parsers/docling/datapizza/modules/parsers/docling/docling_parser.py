@@ -759,6 +759,7 @@ class DoclingParser(Parser):
     def parse(
         self,
         file_path: str | None = None,
+        metadata: dict | None = None,
         *,
         pdf_path: str | None = None,
     ) -> Node:
@@ -767,15 +768,25 @@ class DoclingParser(Parser):
 
         Args:
             file_path: Path to the document to parse. (New preferred parameter)
+            metadata: Optional metadata to be merged into the root document
+                node. Defaults to None.
             pdf_path: [Deprecated] Backward-compatible alias for file_path.
+
         Returns:
             Node: The root document node.
+
+        Raises:
+            ValueError: If file_path is not provided
+            TypeError: If metadata is not a dict or None
         """
+        # Validate metadata type
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
 
         if pdf_path is not None:
             warnings.warn(
-                "The 'pdf_path' parameter is deprecated and will be removed in a future version. "
-                "Use 'file_path' instead.",
+                "The 'pdf_path' parameter is deprecated and will be removed "
+                "in a future version. Use 'file_path' instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -785,7 +796,13 @@ class DoclingParser(Parser):
             raise ValueError("Missing required argument: file_path")
 
         json_data = self.parse_to_json(file_path=file_path)
-        return self._json_to_node(json_data, file_path=file_path)
+        document_node = self._json_to_node(json_data, file_path=file_path)
+
+        # Merge provided metadata into the document node's metadata
+        if metadata:
+            document_node.metadata.update(metadata)
+
+        return document_node
 
 
 def _escape_md(text: str) -> str:

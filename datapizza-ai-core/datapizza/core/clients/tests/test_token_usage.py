@@ -1,5 +1,3 @@
-import pytest
-
 from datapizza.core.clients.models import TokenUsage
 
 
@@ -14,6 +12,7 @@ def test_token_usage_model():
     assert token_usage.completion_tokens == 200
     assert token_usage.cached_tokens == 300
     assert token_usage.thinking_tokens == 400
+
 
 def test_sum_token_usage():
     token_usage1 = TokenUsage(

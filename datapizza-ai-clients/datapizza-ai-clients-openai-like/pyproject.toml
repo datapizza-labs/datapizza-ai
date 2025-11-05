@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-openai-like"
-version = "0.0.7"
+version = "0.0.8"
 description = "OpenAI client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}

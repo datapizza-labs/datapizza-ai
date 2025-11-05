@@ -38,7 +38,7 @@ from datapizza.vectorstores.qdrant import QdrantVectorstore
 vectorstore = QdrantVectorstore(location=":memory:")
 vectorstore.create_collection(
     "my_documents",
-    vector_config=[VectorConfig(name="embedding", dimensions=1536)]
+    vector_config=[VectorConfig(name="text-embedding-3-small", dimensions=1536)]
 )
 
 embedder_client = OpenAIEmbedder(
