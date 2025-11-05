@@ -211,3 +211,34 @@ class TestStatelessAgents:
         list(res2)
 
         assert len(agent._memory) == 0
+
+    def test_tools_with_end_invoke(self):
+        @tool(end=True)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+        )
+
+        res = agent.run("function call")
+        assert len(res.tools_used)
+        assert res.index == 1
+
+    def test_tools_with_not_end_invoke(self):
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+        )
+
+        res = agent.run("function call")
+        assert res.index == 2
