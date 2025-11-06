@@ -357,6 +357,15 @@ class AzureParser(Parser):
         return result.as_dict()
 
     async def a_parse_with_azure_ai(self, file_path: str) -> dict:
+        """
+        Parse a Document with Azure AI Document Intelligence into a json dictionary.
+
+        Args:
+            file_path: Path to the document
+
+        Returns:
+            A dictionary with the Azure AI Document Intelligence response
+        """
         async with aiofiles.open(file_path, "rb") as file:
             file_content = await file.read()
 
@@ -388,7 +397,9 @@ class AzureParser(Parser):
         """
         # Validate metadata type
         if metadata is not None and not isinstance(metadata, dict):
-            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+            raise TypeError(
+                f"metadata must be a dict or None, got {type(metadata).__name__}"
+            )
 
         result_dict = self.parse_with_azure_ai(file_path)
         document_node = self._parse_json(result_dict, file_path=file_path)
@@ -412,9 +423,7 @@ class AzureParser(Parser):
         """
         return self.parse(file_path, metadata)
 
-    async def a_parse(
-        self, file_path: str, metadata: dict | None = None
-    ) -> Node:
+    async def a_parse(self, file_path: str, metadata: dict | None = None) -> Node:
         """
         Async version of parse().
 
@@ -431,7 +440,9 @@ class AzureParser(Parser):
         """
         # Validate metadata type
         if metadata is not None and not isinstance(metadata, dict):
-            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+            raise TypeError(
+                f"metadata must be a dict or None, got {type(metadata).__name__}"
+            )
 
         result_dict = await self.a_parse_with_azure_ai(file_path)
         document_node = self._parse_json(result_dict, file_path=file_path)
