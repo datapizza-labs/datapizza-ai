@@ -53,6 +53,8 @@ members = [
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
     "datapizza-ai-embedders/openai",
+    # Memory
+    "datapizza-ai-memory/redis",
 
     # Modules
     "datapizza-ai-modules/parsers/azure",
@@ -109,6 +111,7 @@ datapizza-ai-tools-duckduckgo = {workspace = true}
 datapizza-ai-tools-filesystem = {workspace = true}
 datapizza-ai-tools-sqldatabase = {workspace = true}
 datapizza-ai-tools-web-fetch = {workspace = true}
+datapizza-ai-memory-redis = { workspace = true }
 
 
 # Hatch build configuration
