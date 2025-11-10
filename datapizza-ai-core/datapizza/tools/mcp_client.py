@@ -33,7 +33,7 @@ class MCPClient:
     def __init__(
         self,
         *,
-        url: str,
+        url: str | None = None,
         command: str | None = None,
         headers: dict[str, str] | None = None,
         args: list[str] | None = None,
