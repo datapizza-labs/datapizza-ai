@@ -187,6 +187,15 @@ class Agent:
 
         return decorated
 
+    @staticmethod
+    def _contains_ending_tool(step: StepResult) -> bool:
+        content = step.content
+        return any(
+            block.tool.end_invoke
+            for block in content
+            if isinstance(block, FunctionCallBlock)
+        )
+
     def as_tool(self):
         return Agent._tool_from_agent(self)
 
@@ -306,6 +315,14 @@ class Agent:
                 final_answer = step_output
                 break
 
+            if (
+                result
+                and isinstance(result, StepResult)
+                and Agent._contains_ending_tool(result)
+            ):
+                self._logger.debug("ending tool found, ending agent")
+                break
+
             current_steps += 1
             original_task = ""
 
@@ -376,7 +393,14 @@ class Agent:
                 final_answer = step_output
                 break
 
-            # task_input = None
+            if (
+                result
+                and isinstance(result, StepResult)
+                and Agent._contains_ending_tool(result)
+            ):
+                self._logger.debug("ending tool found, ending agent")
+                break
+
             current_steps += 1
             original_task = ""
 
