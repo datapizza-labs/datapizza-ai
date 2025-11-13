@@ -52,6 +52,7 @@ members = [
     "datapizza-ai-embedders/cohere",
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
+    "datapizza-ai-embedders/mistral",
     "datapizza-ai-embedders/openai",
 
     # Modules
@@ -90,6 +91,7 @@ datapizza-ai-clients-openai-like = {workspace = true}
 datapizza-ai-embedders-cohere = {workspace = true}
 datapizza-ai-embedders-fastembedder = {workspace = true}
 datapizza-ai-embedders-google = {workspace = true}
+datapizza-ai-embedders-mistral = {workspace = true}
 datapizza-ai-embedders-openai = {workspace = true}
 
 # Modules
