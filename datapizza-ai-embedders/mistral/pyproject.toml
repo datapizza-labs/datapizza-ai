@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1,<0.1.0",
+    "datapizza-ai-core>=0.0.10,<0.1.0",
     "mistralai>=1.2.0,<2.0.0",
 ]
 
