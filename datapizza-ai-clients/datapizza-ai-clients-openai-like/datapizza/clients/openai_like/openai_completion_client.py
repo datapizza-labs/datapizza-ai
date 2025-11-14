@@ -60,6 +60,21 @@ class OpenAILikeClient(Client):
         if not self.a_client:
             self.a_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
+    def _token_usage_from_metadata(self, usage_metadata) -> TokenUsage:
+        if not usage_metadata:
+            return TokenUsage()
+
+        return TokenUsage(
+            prompt_tokens=getattr(usage_metadata, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(usage_metadata, "completion_tokens", 0) or 0,
+            cached_tokens=getattr(
+                getattr(usage_metadata, "prompt_tokens_details", None),
+                "cached_tokens",
+                0,
+            )
+            or 0,
+        )
+
     def _response_to_client_response(
         self, response, tool_map: dict[str, Tool] | None
     ) -> ClientResponse:
@@ -95,16 +110,12 @@ class OpenAILikeClient(Client):
                     )
                     blocks.append(MediaBlock(media=media))
 
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=blocks,
             stop_reason=response.choices[0].finish_reason,
-            usage=TokenUsage(
-                prompt_tokens=response.usage.prompt_tokens or 0,
-                completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
-                if response.usage.prompt_tokens_details
-                else 0 or 0,
-            ),
+            usage=token_usage,
         )
 
     def _convert_tools(self, tools: Tool) -> dict:
@@ -233,18 +244,9 @@ class OpenAILikeClient(Client):
         finish_reason = None
 
         for chunk in response:
-            usage += TokenUsage(
-                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
-                completion_tokens=chunk.usage.completion_tokens
-                if chunk.usage
-                else 0 or 0,
-                cached_tokens=getattr(
-                    getattr(chunk.usage, "prompt_tokens_details", None),
-                    "cached_tokens",
-                    0,
-                )
-                or 0,
-            )
+            usage_metadata = getattr(chunk, "usage", None)
+            token_usage = self._token_usage_from_metadata(usage_metadata)
+            usage += token_usage
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
@@ -298,18 +300,9 @@ class OpenAILikeClient(Client):
         finish_reason = None
 
         async for chunk in await a_client.chat.completions.create(**kwargs):
-            usage += TokenUsage(
-                prompt_tokens=chunk.usage.prompt_tokens if chunk.usage else 0 or 0,
-                completion_tokens=chunk.usage.completion_tokens
-                if chunk.usage
-                else 0 or 0,
-                cached_tokens=getattr(
-                    getattr(chunk.usage, "prompt_tokens_details", {}),
-                    "cached_tokens",
-                    0,
-                )
-                or 0,
-            )
+            usage_metadata = getattr(chunk, "usage", None)
+            token_usage = self._token_usage_from_metadata(usage_metadata)
+            usage += token_usage
 
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
@@ -375,16 +368,12 @@ class OpenAILikeClient(Client):
             )
         else:
             structured_data = json.loads(response.choices[0].message.content)
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            usage=TokenUsage(
-                prompt_tokens=response.usage.prompt_tokens or 0,
-                completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
-                if response.usage.prompt_tokens_details
-                else 0 or 0,
-            ),
+            usage=token_usage,
         )
 
     async def _a_structured_response(
@@ -429,14 +418,10 @@ class OpenAILikeClient(Client):
             )
         else:
             structured_data = json.loads(response.choices[0].message.content)
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            usage=TokenUsage(
-                prompt_tokens=response.usage.prompt_tokens or 0,
-                completion_tokens=response.usage.completion_tokens or 0,
-                cached_tokens=response.usage.prompt_tokens_details.cached_tokens
-                if response.usage.prompt_tokens_details
-                else 0 or 0,
-            ),
+            usage=token_usage,
         )
