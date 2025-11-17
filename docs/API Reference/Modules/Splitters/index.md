@@ -40,7 +40,7 @@ from datapizza.modules.parsers import TextParser
 from datapizza.modules.splitters import NodeSplitter
 
 parser = TextParser()
-splitter = NodeSplitter(chunk_size=800, preserve_structure=True)
+splitter = NodeSplitter(max_char = 4000)
 
 document = parser.parse(text_content)
 structured_chunks = splitter(document)

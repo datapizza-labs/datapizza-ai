@@ -7,8 +7,10 @@ from typing import Any, Literal, Union, cast
 from pydantic import BaseModel
 
 from datapizza.agents.logger import AgentLogger
-from datapizza.core.clients import Client
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
+from datapizza.core.executors.async_executor import AsyncExecutor
+from datapizza.core.utils import sum_token_usage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.tracing.tracing import agent_span, tool_span
@@ -32,9 +34,11 @@ class StepResult:
         self,
         index: int,
         content: list[Block],
+        usage: TokenUsage | None = None,
     ):
         self.index = index
         self.content = content
+        self.usage = usage or TokenUsage()
 
     @property
     def text(self) -> str:
@@ -154,8 +158,8 @@ class Agent:
 
     @classmethod
     def _tool_from_agent(cls, agent: "Agent"):
-        def invoke_agent(input_task: str):
-            return cast(StepResult, agent.run(input_task)).text
+        async def invoke_agent(input_task: str):
+            return cast(StepResult, await agent.a_run(input_task)).text
 
         a_tool = Tool(
             func=invoke_agent,
@@ -182,6 +186,15 @@ class Agent:
                 return func(self, *args, **kwargs)
 
         return decorated
+
+    @staticmethod
+    def _contains_ending_tool(step: StepResult) -> bool:
+        content = step.content
+        return any(
+            block.tool.end_invoke
+            for block in content
+            if isinstance(block, FunctionCallBlock)
+        )
 
     def as_tool(self):
         return Agent._tool_from_agent(self)
@@ -302,6 +315,14 @@ class Agent:
                 final_answer = step_output
                 break
 
+            if (
+                result
+                and isinstance(result, StepResult)
+                and Agent._contains_ending_tool(result)
+            ):
+                self._logger.debug("ending tool found, ending agent")
+                break
+
             current_steps += 1
             original_task = ""
 
@@ -372,7 +393,14 @@ class Agent:
                 final_answer = step_output
                 break
 
-            # task_input = None
+            if (
+                result
+                and isinstance(result, StepResult)
+                and Agent._contains_ending_tool(result)
+            ):
+                self._logger.debug("ending tool found, ending agent")
+                break
+
             current_steps += 1
             original_task = ""
 
@@ -421,6 +449,7 @@ class Agent:
     ) -> Generator[StepResult | ClientResponse, None, None]:
         """Execute a planning step with streaming support."""
         tool_results = []
+        step_usage = TokenUsage()
 
         # Check if streaming is enabled
         response: ClientResponse
@@ -432,6 +461,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             ):
+                step_usage += chunk.usage
                 response = chunk
                 if chunk.delta:
                     yield chunk
@@ -445,6 +475,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             )
+            step_usage += response.usage
 
         if not response:
             raise RuntimeError("No response from client")
@@ -468,6 +499,7 @@ class Agent:
         step_action = StepResult(
             index=current_step,
             content=response.content + tool_results,
+            usage=response.usage,
         )
 
         yield step_action
@@ -477,7 +509,7 @@ class Agent:
     ) -> AsyncGenerator[StepResult | ClientResponse, None]:
         """Execute a planning step with streaming support."""
         tool_results = []
-
+        step_usage = TokenUsage()
         # Check if streaming is enabled
         response: ClientResponse
         if self._stream:
@@ -488,6 +520,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             ):
+                step_usage += chunk.usage
                 response = chunk
                 if chunk.delta:
                     yield chunk
@@ -501,6 +534,7 @@ class Agent:
                 system_prompt=self.system_prompt,
                 **kwargs,
             )
+            step_usage += response.usage
 
         if planning_prompt:
             memory.add_turn(TextBlock(content=planning_prompt), role=ROLE.USER)
@@ -521,6 +555,7 @@ class Agent:
         step_action = StepResult(
             index=current_step,
             content=response.content + tool_results,
+            usage=response.usage,
         )
 
         yield step_action
@@ -531,14 +566,8 @@ class Agent:
         with tool_span(f"Tool {function_call.tool.name}"):
             result = function_call.tool(**function_call.arguments)
 
-            # Note: sync version doesn't handle awaitable results
-            # If the tool returns an awaitable, we can't handle it in sync mode
-            if inspect.isawaitable(result):
-                raise RuntimeError(
-                    f"""Cannot run async tool in sync mode.
-                    Tool {function_call.tool.name} returned an awaitable result.
-                    Use async agent methods for async tools or pass sync tools."""
-                )
+            if inspect.iscoroutine(result):
+                result = AsyncExecutor.get_instance().run(result)
 
             if result:
                 self._logger.log_panel(
@@ -558,7 +587,7 @@ class Agent:
         with tool_span(f"Tool {function_call.tool.name}"):
             result = function_call.tool(**function_call.arguments)
 
-            if inspect.isawaitable(result):
+            if inspect.iscoroutine(result):
                 result = await result
 
             if result:
@@ -593,10 +622,20 @@ class Agent:
             The final result of the agent's execution
         """
         with agent_span(f"Agent {self.name}"):
-            return cast(
-                StepResult,
-                list(self._invoke_stream(task_input, tool_choice, **gen_kwargs))[-1],
+            usage = TokenUsage()
+            steps = list[ClientResponse | StepResult | Plan | None](
+                self._invoke_stream(task_input, tool_choice, **gen_kwargs)
             )
+            usage += sum_token_usage(
+                [step.usage for step in steps if isinstance(step, StepResult)]
+            )
+
+            last_step = cast(
+                StepResult,
+                steps[-1],
+            )
+            last_step.usage = usage
+            return last_step
 
     @_lock_if_not_stateless
     async def a_run(
@@ -618,9 +657,17 @@ class Agent:
             The final result of the agent's execution
         """
         with agent_span(f"Agent {self.name}"):
+            total_usage = TokenUsage()
             results = []
             async for result in self._a_invoke_stream(
                 task_input, tool_choice, **gen_kwargs
             ):
                 results.append(result)
-            return results[-1] if results else None
+
+            total_usage += sum_token_usage(
+                [result.usage for result in results if isinstance(result, StepResult)]
+            )
+            last_result = results[-1] if results else None
+            if last_result:
+                last_result.usage = total_usage
+            return last_result

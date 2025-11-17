@@ -2,11 +2,12 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator, Iterator
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
@@ -65,6 +66,16 @@ class MistralClient(Client):
     def _set_client(self):
         self.client = Mistral(api_key=self.api_key)
 
+    def _token_usage_from_metadata(self, usage_metadata: Any | None) -> TokenUsage:
+        if not usage_metadata:
+            return TokenUsage()
+
+        return TokenUsage(
+            prompt_tokens=getattr(usage_metadata, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(usage_metadata, "completion_tokens", 0) or 0,
+            cached_tokens=getattr(usage_metadata, "cached_tokens", 0) or 0,
+        )
+
     def _response_to_client_response(
         self, response, tool_map: dict[str, Tool] | None = None
     ) -> ClientResponse:
@@ -101,12 +112,12 @@ class MistralClient(Client):
                     blocks.append(MediaBlock(media=media))
 
         log.debug(f"{self.__class__.__name__} response = {response}")
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=blocks,
             stop_reason=response.choices[0].finish_reason,
-            prompt_tokens_used=response.usage.prompt_tokens,
-            completion_tokens_used=response.usage.completion_tokens,
-            cached_tokens_used=0,
+            usage=token_usage,
         )
 
     def _convert_tools(self, tools: Tool) -> dict:
@@ -232,21 +243,28 @@ class MistralClient(Client):
 
         response = self.client.chat.stream(**request_params)
         text = ""
+        usage = TokenUsage()
+        stop_reason = None
         for chunk in response:
-            delta = chunk.data.choices[0].delta.content or ""
+            token_usage = self._token_usage_from_metadata(
+                getattr(chunk.data, "usage", None)
+            )
+            usage += token_usage
+            stop_reason = chunk.data.choices[0].finish_reason
+            delta_content = chunk.data.choices[0].delta.content
+            delta = str(delta_content or "")
             text += delta
             yield ClientResponse(
                 content=[],
-                delta=str(delta),
-                stop_reason=chunk.data.choices[0].finish_reason,
-                prompt_tokens_used=chunk.data.usage.prompt_tokens
-                if chunk.data.usage
-                else 0,
-                completion_tokens_used=chunk.data.usage.completion_tokens
-                if chunk.data.usage
-                else 0,
-                cached_tokens_used=0,
+                delta=delta,
+                stop_reason=stop_reason,
             )
+
+        yield ClientResponse(
+            content=[TextBlock(content=text)],
+            stop_reason=stop_reason,
+            usage=usage,
+        )
 
     async def _a_stream_invoke(
         self,
@@ -278,21 +296,28 @@ class MistralClient(Client):
 
         response = await self.client.chat.stream_async(**request_params)
         text = ""
+        usage = TokenUsage()
+        stop_reason = None
         async for chunk in response:
-            delta = chunk.data.choices[0].delta.content or ""
+            token_usage = self._token_usage_from_metadata(
+                getattr(chunk.data, "usage", None)
+            )
+            usage += token_usage
+            stop_reason = chunk.data.choices[0].finish_reason
+            delta_content = chunk.data.choices[0].delta.content
+            delta = str(delta_content or "")
             text += delta
             yield ClientResponse(
                 content=[],
-                delta=str(delta),
-                stop_reason=chunk.data.choices[0].finish_reason,
-                prompt_tokens_used=chunk.data.usage.prompt_tokens
-                if chunk.data.usage
-                else 0,
-                completion_tokens_used=chunk.data.usage.completion_tokens
-                if chunk.data.usage
-                else 0,
-                cached_tokens_used=0,
+                delta=delta,
+                stop_reason=stop_reason,
             )
+
+        yield ClientResponse(
+            content=[TextBlock(content=text)],
+            stop_reason=stop_reason,
+            usage=usage,
+        )
 
     def _structured_response(
         self,
@@ -336,12 +361,12 @@ class MistralClient(Client):
             )
         else:
             structured_data = json.loads(str(response.choices[0].message.content))  # type: ignore
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            prompt_tokens_used=response.usage.prompt_tokens,
-            completion_tokens_used=response.usage.completion_tokens,
-            cached_tokens_used=0,
+            usage=token_usage,
         )
 
     async def _a_structured_response(
@@ -386,12 +411,12 @@ class MistralClient(Client):
             )
         else:
             structured_data = json.loads(str(response.choices[0].message.content))  # type: ignore
+        usage_metadata = getattr(response, "usage", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
-            prompt_tokens_used=response.usage.prompt_tokens,
-            completion_tokens_used=response.usage.completion_tokens,
-            cached_tokens_used=0,
+            usage=token_usage,
         )
 
     def _embed(
@@ -402,7 +427,9 @@ class MistralClient(Client):
             inputs=text, model=model_name or self.model_name, **kwargs
         )
 
-        embeddings = [item.embedding for item in response.data]
+        embeddings = [
+            item.embedding for item in response.data if item.embedding is not None
+        ]
 
         if not embeddings:
             return []
@@ -420,7 +447,9 @@ class MistralClient(Client):
             inputs=text, model=model_name or self.model_name, **kwargs
         )
 
-        embeddings = [item.embedding for item in response.data]
+        embeddings = [
+            item.embedding for item in response.data if item.embedding is not None
+        ]
 
         if not embeddings:
             return []
@@ -428,7 +457,7 @@ class MistralClient(Client):
         if isinstance(text, str) and embeddings[0]:
             return embeddings[0]
 
-        return embeddings or []
+        return embeddings
 
     def parse_document(
         self,

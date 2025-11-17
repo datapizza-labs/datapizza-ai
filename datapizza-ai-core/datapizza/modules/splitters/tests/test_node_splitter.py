@@ -26,6 +26,13 @@ def test_process_with_children():
     assert any(node.text == "Child 2" for node in result)
 
 
+def test_empy_node():
+    splitter = NodeSplitter(max_char=10)
+    node = Node()
+    result = splitter.run(node)
+    assert len(result) == 0
+
+
 def test_process_large_content_no_children():
     """Test processing a node with content larger than max_char but no children"""
     splitter = NodeSplitter(max_char=10)

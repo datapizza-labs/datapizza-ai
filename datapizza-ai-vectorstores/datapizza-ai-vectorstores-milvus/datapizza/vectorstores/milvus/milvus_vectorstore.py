@@ -1,16 +1,17 @@
 import logging
 from collections.abc import Generator
-from typing import Any, Optional
+from typing import Any
 
-from datapizza.core.vectorstore import Vectorstore, VectorConfig
+from datapizza.core.vectorstore import VectorConfig, Vectorstore
 from datapizza.type import (
     Chunk,
-    Embedding,
     DenseEmbedding,
-    SparseEmbedding,
+    Embedding,
     EmbeddingFormat,
+    SparseEmbedding,
 )
 from pymilvus import (
+    AsyncMilvusClient,
     CollectionSchema,
     DataType,
     FieldSchema,
@@ -66,17 +67,18 @@ class MilvusVectorstore(Vectorstore):
         if secure is not None:
             self.conn_kwargs["secure"] = secure
 
+        # Allow extra MilvusClient kwargs (e.g. token for Zilliz)
         self.conn_kwargs.update(connection_args or {})
-        self.batch_size: int = batch_size
+        self.client: MilvusClient
+        self.a_client: AsyncMilvusClient
+        self.batch_size: int = 100
 
     def get_client(self) -> MilvusClient:
-        """Get or create synchronous client."""
         if not hasattr(self, "client"):
             self._init_client()
         return self.client
 
     def _get_a_client(self) -> AsyncMilvusClient:
-        """Get or create asynchronous client."""
         if not hasattr(self, "a_client"):
             self._init_a_client()
         return self.a_client

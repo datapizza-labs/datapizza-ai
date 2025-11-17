@@ -1,4 +1,5 @@
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -6,20 +7,24 @@ from datapizza.core.modules.parser import Parser
 from datapizza.type import Node, NodeType
 from datapizza.type.type import Media, MediaNode
 
-from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import (
+    DocumentConverter,
+    PdfFormatOption,
+)
 
-from .utils import extract_media_from_docling_bbox, is_pdf_file
+from .ocr_options import OCROptions
+from .utils import extract_media_from_docling_bbox
 
 
 class DoclingParser(Parser):
     """
-    Parser that converts PDF files using Docling and then converts the resulting
+    Parser that converts files using Docling and then converts the resulting
     DoclingDocument JSON into a datapizza Node tree.
+    Supported file extensions: https://docling-project.github.io/docling/usage/supported_formats/
 
-    - Accepts PDF files directly and processes them using Docling DocumentConverter
+    - Accepts files directly and processes them using Docling DocumentConverter
     - Logical-only hierarchy (no page nodes)
     - Paragraphs are leaf nodes; no sentence splitting by default
     - Full preservation of Docling items stored in node.metadata["docling_raw"],
@@ -27,25 +32,41 @@ class DoclingParser(Parser):
     - Reading order follows body.children ($ref list)
     - Images and tables are mapped to FIGURE and TABLE nodes respectively, with bbox-only metadata
     """
+    def __init__(
+        self,
+        json_output_dir: str | None = None,
+        ocr_options: OCROptions | None = None,
+    ):
+        """
+        Initialize DoclingParser with optional OCR configuration.
 
-    def __init__(self, json_output_dir: str | None = None):
+        Args:
+            json_output_dir: Optional directory to save intermediate Docling JSON results.
+            ocr_options: OCR configuration. Defaults to EasyOCR (backward compatible) if not provided.
+        """
         self.converter = None
         # Optional directory to save intermediate Docling JSON results
         self.json_output_dir = json_output_dir
+        self.ocr_options = ocr_options or OCROptions()
 
     def _create_converter(self):
-        """Create a Docling DocumentConverter."""
-        # Configure pipeline options for table structure detection and OCR
-        pipeline_options = PdfPipelineOptions(do_table_structure=True)
-        ocr_options = EasyOcrOptions(force_full_page_ocr=True)
-        pipeline_options.ocr_options = ocr_options
+        """
+        Create a Docling DocumentConverter with configured OCR options.
+
+        Uses self.ocr_options to determine which OCR engine to use and
+        passes the appropriate configuration to Docling.
+
+        Returns:
+            Configured DocumentConverter instance
+        """
+        # Convert internal OCR options to Docling pipeline kwargs
+        pipeline_kwargs = self.ocr_options.to_docling_pipeline_options()
+        pipeline_options = PdfPipelineOptions(**pipeline_kwargs)
 
         return DocumentConverter(
             format_options={
-                InputFormat.PDF: PdfFormatOption(
-                    pipeline_options=pipeline_options, backend=PyPdfiumDocumentBackend
-                )
-            }
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            },
         )
 
     def _get_converter(self):
@@ -58,38 +79,34 @@ class DoclingParser(Parser):
         """Check if the file is a JSON file."""
         return Path(file_path).suffix.lower() == ".json"
 
-    def parse_to_json(self, pdf_path: str) -> dict:
+    def parse_to_json(self, file_path: str) -> dict:
         """
-        Parse a PDF file using Docling, or if json_path is provided, load that
+        Parse a supported file using Docling, or if json_path is provided, load that
         Docling JSON directly and skip conversion.
 
         Args:
-            pdf_path: Path to the source PDF (required for media extraction)
+            file_path: Path to the source File (required for media extraction)
             json_path: Optional path to a Docling JSON file to skip conversion
 
         Returns:
             Docling document as a dictionary
         """
-        if not is_pdf_file(pdf_path):
-            raise ValueError(
-                f"Unsupported pdf_path format: {Path(pdf_path).suffix}. Supported: .pdf"
-            )
 
         converter = self._get_converter()
-        result = converter.convert(pdf_path)
+        result = converter.convert(file_path)
         doc_dict = result.document.export_to_dict()
 
         # Optionally persist intermediate Docling JSON beside the pipeline output
         if self.json_output_dir:
             out_dir = Path(self.json_output_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{Path(pdf_path).stem}.json"
+            out_path = out_dir / f"{Path(file_path).stem}.json"
             with open(out_path, "w", encoding="utf-8") as fp:
                 json.dump(doc_dict, fp, ensure_ascii=False, indent=2)
 
         return doc_dict
 
-    def _json_to_node(self, json_data: dict, pdf_path: str | None = None) -> Node:
+    def _json_to_node(self, json_data: dict, file_path: str | None = None) -> Node:
         """
         Convert Docling JSON into a Node hierarchy.
         """
@@ -366,7 +383,7 @@ class DoclingParser(Parser):
             current_list_items = []
 
         def _extract_base64_from_pdf_bbox(prov_entry: dict[str, Any]) -> str | None:
-            if not pdf_path or Path(pdf_path).suffix.lower() != ".pdf":
+            if not file_path or Path(file_path).suffix.lower() != ".pdf":
                 return None
             page_no = int((prov_entry or {}).get("page_no") or 0)
             bbox = (prov_entry or {}).get("bbox") or {}
@@ -374,7 +391,7 @@ class DoclingParser(Parser):
                 return None
             try:
                 return extract_media_from_docling_bbox(
-                    bbox=bbox, file_path=pdf_path, page_number=page_no
+                    bbox=bbox, file_path=file_path, page_number=page_no
                 )
             except Exception:
                 return None
@@ -739,9 +756,53 @@ class DoclingParser(Parser):
 
         return document_node
 
-    def parse(self, pdf_path: str, metadata: dict | None = None) -> Node:
-        json_data = self.parse_to_json(pdf_path=pdf_path)
-        return self._json_to_node(json_data, pdf_path=pdf_path)
+    def parse(
+        self,
+        file_path: str | None = None,
+        metadata: dict | None = None,
+        *,
+        pdf_path: str | None = None,
+    ) -> Node:
+        """
+        Parse a document into a datapizza Node tree using Docling.
+
+        Args:
+            file_path: Path to the document to parse. (New preferred parameter)
+            metadata: Optional metadata to be merged into the root document
+                node. Defaults to None.
+            pdf_path: [Deprecated] Backward-compatible alias for file_path.
+
+        Returns:
+            Node: The root document node.
+
+        Raises:
+            ValueError: If file_path is not provided
+            TypeError: If metadata is not a dict or None
+        """
+        # Validate metadata type
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+
+        if pdf_path is not None:
+            warnings.warn(
+                "The 'pdf_path' parameter is deprecated and will be removed "
+                "in a future version. Use 'file_path' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            file_path = file_path or pdf_path
+
+        if not file_path:
+            raise ValueError("Missing required argument: file_path")
+
+        json_data = self.parse_to_json(file_path=file_path)
+        document_node = self._json_to_node(json_data, file_path=file_path)
+
+        # Merge provided metadata into the document node's metadata
+        if metadata:
+            document_node.metadata.update(metadata)
+
+        return document_node
 
 
 def _escape_md(text: str) -> str:

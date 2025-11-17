@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-tools-duckduckgo"
-version = "0.0.3"
+version = "0.0.4"
 description = "Azure Document Intelligence parser for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1",
+    "datapizza-ai-core>=0.0.1,<0.1.0",
     "ddgs>=9.6.0",
 ]
 

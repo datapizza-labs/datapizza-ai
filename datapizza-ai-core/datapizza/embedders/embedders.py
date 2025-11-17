@@ -5,7 +5,7 @@ import requests
 from datapizza.core.clients import Client
 from datapizza.core.embedder import BaseEmbedder
 from datapizza.core.models import PipelineComponent
-from datapizza.type import Chunk, DenseEmbedding
+from datapizza.type import Chunk, DenseEmbedding, SparseEmbedding
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class ChunkEmbedder(PipelineComponent):
 
     def __init__(
         self,
-        client: Client,
+        client: BaseEmbedder,
         model_name: str | None = None,
         embedding_name: str | None = None,
         batch_size: int = 2047,
@@ -77,9 +77,13 @@ class ChunkEmbedder(PipelineComponent):
             embeddings = self.client.embed([n.text for n in batch], self.model_name)
 
             for n, embedding in zip(batch, embeddings, strict=False):
-                n.embeddings.append(
-                    DenseEmbedding(name=self.embedding_name, vector=embedding)  # type: ignore
-                )
+                if isinstance(embedding, SparseEmbedding):
+                    embedding.name = self.embedding_name
+                    n.embeddings.append(embedding)
+                else:
+                    n.embeddings.append(
+                        DenseEmbedding(name=self.embedding_name, vector=embedding)  # type: ignore
+                    )
 
         return nodes
 
@@ -102,9 +106,12 @@ class ChunkEmbedder(PipelineComponent):
             )
 
             for n, embedding in zip(batch, embeddings, strict=False):
-                n.embeddings.append(
-                    DenseEmbedding(name=self.embedding_name, vector=embedding)  # type: ignore
-                )
+                if isinstance(embedding, SparseEmbedding):
+                    n.embeddings.append(embedding)
+                else:
+                    n.embeddings.append(
+                        DenseEmbedding(name=self.embedding_name, vector=embedding)  # type: ignore
+                    )
 
         return nodes
 

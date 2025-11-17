@@ -5,6 +5,7 @@ from typing import Literal
 import httpx
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
@@ -47,6 +48,15 @@ class OpenAIClient(Client):
         temperature: float | None = None,
         cache: Cache | None = None,
         base_url: str | httpx.URL | None = None,
+        organization: str | None = None,
+        project: str | None = None,
+        webhook_secret: str | None = None,
+        websocket_base_url: str | httpx.URL | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        max_retries: int = 2,
+        default_headers: dict[str, str] | None = None,
+        default_query: dict[str, object] | None = None,
+        http_client: httpx.Client | None = None,
     ):
         """
         Args:
@@ -56,6 +66,15 @@ class OpenAIClient(Client):
             temperature: The temperature to use for the OpenAI API.
             cache: The cache to use for the OpenAI API.
             base_url: The base URL for the OpenAI API.
+            organization: The organization ID for the OpenAI API.
+            project: The project ID for the OpenAI API.
+            webhook_secret: The webhook secret for the OpenAI API.
+            websocket_base_url: The websocket base URL for the OpenAI API.
+            timeout: The timeout for the OpenAI API.
+            max_retries: The max retries for the OpenAI API.
+            default_headers: The default headers for the OpenAI API.
+            default_query: The default query for the OpenAI API.
+            http_client: The http_client for the OpenAI API.
         """
 
         if temperature and not 0 <= temperature <= 2:
@@ -68,18 +87,51 @@ class OpenAIClient(Client):
             cache=cache,
         )
 
-        self.base_url = base_url
         self.api_key = api_key
+        self.base_url = base_url
+        self.organization = organization
+        self.project = project
+        self.webhook_secret = webhook_secret
+        self.websocket_base_url = websocket_base_url
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.default_headers = default_headers
+        self.default_query = default_query
+        self.http_client = http_client
+
         self.memory_adapter = OpenAIMemoryAdapter()
         self._set_client()
 
     def _set_client(self):
         if not self.client:
-            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                organization=self.organization,
+                project=self.project,
+                webhook_secret=self.webhook_secret,
+                websocket_base_url=self.websocket_base_url,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+                default_headers=self.default_headers,
+                default_query=self.default_query,
+                http_client=self.http_client,
+            )
 
     def _set_a_client(self):
         if not self.a_client:
-            self.a_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+            self.a_client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                organization=self.organization,
+                project=self.project,
+                webhook_secret=self.webhook_secret,
+                websocket_base_url=self.websocket_base_url,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+                default_headers=self.default_headers,
+                default_query=self.default_query,
+            )
 
     def _response_to_client_response(
         self, response, tool_map: dict[str, Tool] | None
@@ -140,9 +192,11 @@ class OpenAIClient(Client):
         return ClientResponse(
             content=blocks,
             stop_reason=stop_reason,
-            prompt_tokens_used=prompt_tokens or 0,
-            completion_tokens_used=completion_tokens or 0,
-            cached_tokens_used=cached_tokens or 0,
+            usage=TokenUsage(
+                prompt_tokens=prompt_tokens or 0,
+                completion_tokens=completion_tokens or 0,
+                cached_tokens=cached_tokens or 0,
+            ),
         )
 
     def _convert_tools(self, tool: Tool) -> dict:
@@ -192,11 +246,11 @@ class OpenAIClient(Client):
         tool_map = {tool.name: tool for tool in tools}
 
         kwargs = {
+            **kwargs,
             "model": self.model_name,
             "input": messages,
             "stream": False,
             "max_output_tokens": max_tokens,
-            **kwargs,
         }
         if temperature:
             kwargs["temperature"] = temperature
@@ -228,11 +282,11 @@ class OpenAIClient(Client):
         tool_map = {tool.name: tool for tool in tools}
 
         kwargs = {
+            **kwargs,
             "model": self.model_name,
             "input": messages,
             "stream": False,
             "max_output_tokens": max_tokens,
-            **kwargs,
         }
         if temperature:
             kwargs["temperature"] = temperature
@@ -263,12 +317,12 @@ class OpenAIClient(Client):
         tool_map = {tool.name: tool for tool in tools}
 
         kwargs = {
+            **kwargs,
             "model": self.model_name,
             "input": messages,
             "stream": True,
             "max_output_tokens": max_tokens,
             # "stream_options": {"include_usage": True},
-            **kwargs,
         }
         if temperature:
             kwargs["temperature"] = temperature
@@ -284,9 +338,11 @@ class OpenAIClient(Client):
                     content=[],
                     delta=chunk.delta,
                     stop_reason=None,
-                    prompt_tokens_used=0,
-                    completion_tokens_used=0,
-                    cached_tokens_used=0,
+                    usage=TokenUsage(
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_tokens=0,
+                    ),
                 )
 
             if isinstance(chunk, ResponseCompletedEvent):
@@ -309,12 +365,12 @@ class OpenAIClient(Client):
 
         tool_map = {tool.name: tool for tool in tools}
         kwargs = {
+            **kwargs,
             "model": self.model_name,
             "input": messages,
             "stream": True,
             "max_output_tokens": max_tokens,
             # "stream_options": {"include_usage": True},
-            **kwargs,
         }
         if temperature:
             kwargs["temperature"] = temperature
@@ -331,9 +387,11 @@ class OpenAIClient(Client):
                     content=[],
                     delta=chunk.delta,
                     stop_reason=None,
-                    prompt_tokens_used=0,
-                    completion_tokens_used=0,
-                    cached_tokens_used=0,
+                    usage=TokenUsage(
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        cached_tokens=0,
+                    ),
                 )
 
             if isinstance(chunk, ResponseCompletedEvent):
@@ -374,8 +432,8 @@ class OpenAIClient(Client):
             kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
             # Structured response needs strict mode and no additional properties
             for tool in kwargs["tools"]:
-                tool["function"]["strict"] = True
-                tool["function"]["parameters"]["additionalProperties"] = False
+                tool["strict"] = True
+                tool["parameters"]["additionalProperties"] = False
 
         response = self.client.responses.parse(**kwargs)
 
@@ -414,8 +472,8 @@ class OpenAIClient(Client):
             kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
             # Structured response needs strict mode and no additional properties
             for tool in kwargs["tools"]:
-                tool["function"]["strict"] = True
-                tool["function"]["parameters"]["additionalProperties"] = False
+                tool["strict"] = True
+                tool["parameters"]["additionalProperties"] = False
 
         a_client = self._get_a_client()
         response = await a_client.responses.parse(**kwargs)

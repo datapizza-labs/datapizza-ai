@@ -1,8 +1,9 @@
 from collections.abc import AsyncIterator, Iterator
-from typing import Literal
+from typing import Any, Literal
 
 from datapizza.core.cache import Cache
 from datapizza.core.clients import Client, ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
@@ -132,6 +133,16 @@ class GoogleClient(Client):
             google_tools.append(types.Tool(google_search=types.GoogleSearch()))
 
         return google_tools if google_tools else None
+
+    def _token_usage_from_metadata(self, usage_metadata: Any | None) -> TokenUsage:
+        if not usage_metadata:
+            return TokenUsage()
+
+        return TokenUsage(
+            prompt_tokens=getattr(usage_metadata, "prompt_token_count", 0) or 0,
+            completion_tokens=getattr(usage_metadata, "candidates_token_count", 0) or 0,
+            cached_tokens=getattr(usage_metadata, "cached_content_token_count", 0) or 0,
+        )
 
     def _convert_tool_choice(
         self, tool_choice: Literal["auto", "required", "none"] | list[str]
@@ -265,11 +276,15 @@ class GoogleClient(Client):
         message_text = ""
         thought_block = ThoughtBlock(content="")
 
+        usage = TokenUsage()
+
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
             contents=contents,  # type: ignore
             config=config,
         ):
+            usage_metadata = getattr(chunk, "usage_metadata", None)
+            usage += self._token_usage_from_metadata(usage_metadata)
             if not chunk.candidates:
                 raise ValueError("No candidates in response")
 
@@ -288,24 +303,7 @@ class GoogleClient(Client):
                     content=[],
                     delta=chunk.text or "",
                     stop_reason=stop_reason,
-                    prompt_tokens_used=(
-                        chunk.usage_metadata.prompt_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.prompt_token_count
-                        else 0
-                    ),
-                    completion_tokens_used=(
-                        chunk.usage_metadata.candidates_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.candidates_token_count
-                        else 0
-                    ),
-                    cached_tokens_used=(
-                        chunk.usage_metadata.cached_content_token_count
-                        if chunk.usage_metadata
-                        and chunk.usage_metadata.cached_content_token_count
-                        else 0
-                    ),
+                    usage=usage,
                 )
                 continue
 
@@ -322,25 +320,12 @@ class GoogleClient(Client):
                             content=[],
                             delta=chunk.text or "",
                             stop_reason=stop_reason,
-                            prompt_tokens_used=(
-                                chunk.usage_metadata.prompt_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.prompt_token_count
-                                else 0
-                            ),
-                            completion_tokens_used=(
-                                chunk.usage_metadata.candidates_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.candidates_token_count
-                                else 0
-                            ),
-                            cached_tokens_used=(
-                                chunk.usage_metadata.cached_content_token_count
-                                if chunk.usage_metadata
-                                and chunk.usage_metadata.cached_content_token_count
-                                else 0
-                            ),
                         )
+        yield ClientResponse(
+            content=[TextBlock(content=message_text)],
+            stop_reason=stop_reason,
+            usage=usage,
+        )
 
     async def _a_stream_invoke(
         self,
@@ -370,6 +355,7 @@ class GoogleClient(Client):
             **kwargs,
         )
 
+        usage = TokenUsage()
         message_text = ""
         thought_block = ThoughtBlock(content="")
         async for chunk in await self.client.aio.models.generate_content_stream(
@@ -377,6 +363,12 @@ class GoogleClient(Client):
             contents=contents,  # type: ignore
             config=config,
         ):  # type: ignore
+            usage_metadata = getattr(chunk, "usage_metadata", None)
+            usage += self._token_usage_from_metadata(usage_metadata)
+
+            if not chunk.candidates:
+                raise ValueError("No candidates in response")
+
             finish_reason = chunk.candidates[0].finish_reason
             stop_reason = (
                 finish_reason.value.lower()
@@ -385,24 +377,16 @@ class GoogleClient(Client):
             )
 
             # Handle the case where the response has no parts
-            if not chunk.candidates[0].content.parts:
+            candidate_content = chunk.candidates[0].content
+            if not candidate_content or not candidate_content.parts:
                 yield ClientResponse(
                     content=[],
                     delta=chunk.text or "",
                     stop_reason=stop_reason,
-                    prompt_tokens_used=chunk.usage_metadata.prompt_token_count
-                    if chunk.usage_metadata
-                    else 0,
-                    completion_tokens_used=chunk.usage_metadata.candidates_token_count
-                    if chunk.usage_metadata
-                    else 0,
-                    cached_tokens_used=chunk.usage_metadata.cached_content_token_count
-                    if chunk.usage_metadata
-                    else 0,
                 )
                 continue
 
-            for part in chunk.candidates[0].content.parts:
+            for part in candidate_content.parts:
                 if not part.text:
                     continue
                 elif hasattr(part, "thought") and part.thought:
@@ -414,19 +398,12 @@ class GoogleClient(Client):
                             content=[],
                             delta=chunk.text or "",
                             stop_reason=stop_reason,
-                            prompt_tokens_used=chunk.usage_metadata.prompt_token_count
-                            if chunk.usage_metadata
-                            and chunk.usage_metadata.prompt_token_count
-                            else 0,
-                            completion_tokens_used=chunk.usage_metadata.candidates_token_count
-                            if chunk.usage_metadata
-                            and chunk.usage_metadata.candidates_token_count
-                            else 0,
-                            cached_tokens_used=chunk.usage_metadata.cached_content_token_count
-                            if chunk.usage_metadata
-                            and chunk.usage_metadata.cached_content_token_count
-                            else 0,
                         )
+        yield ClientResponse(
+            content=[TextBlock(content=message_text)],
+            stop_reason=stop_reason,
+            usage=usage,
+        )
 
     def _structured_response(
         self,
@@ -467,29 +444,14 @@ class GoogleClient(Client):
             raise ValueError("No response from Google GenAI")
 
         structured_data = output_cls.model_validate_json(str(response.text))
+        usage_metadata = getattr(response, "usage_metadata", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=response.candidates[0].finish_reason.value.lower()
             if response.candidates[0].finish_reason
             else None,
-            prompt_tokens_used=(
-                response.usage_metadata.prompt_token_count
-                if response.usage_metadata
-                and response.usage_metadata.prompt_token_count
-                else 0
-            ),
-            completion_tokens_used=(
-                response.usage_metadata.candidates_token_count
-                if response.usage_metadata
-                and response.usage_metadata.candidates_token_count
-                else 0
-            ),
-            cached_tokens_used=(
-                response.usage_metadata.cached_content_token_count
-                if response.usage_metadata
-                and response.usage_metadata.cached_content_token_count
-                else 0
-            ),
+            usage=token_usage,
         )
 
     async def _a_structured_response(
@@ -531,29 +493,14 @@ class GoogleClient(Client):
             raise ValueError("No response from Google GenAI")
 
         structured_data = output_cls.model_validate_json(str(response.text))
+        usage_metadata = getattr(response, "usage_metadata", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
             stop_reason=response.candidates[0].finish_reason.value.lower()
             if response.candidates[0].finish_reason
             else None,
-            prompt_tokens_used=(
-                response.usage_metadata.prompt_token_count
-                if response.usage_metadata
-                and response.usage_metadata.prompt_token_count
-                else 0
-            ),
-            completion_tokens_used=(
-                response.usage_metadata.candidates_token_count
-                if response.usage_metadata
-                and response.usage_metadata.candidates_token_count
-                else 0
-            ),
-            cached_tokens_used=(
-                response.usage_metadata.cached_content_token_count
-                if response.usage_metadata
-                and response.usage_metadata.cached_content_token_count
-                else 0
-            ),
+            usage=token_usage,
         )
 
     def _embed(
@@ -651,18 +598,11 @@ class GoogleClient(Client):
                     blocks.append(ThoughtBlock(content=part.text))
 
         usage_metadata = getattr(response, "usage_metadata", None)
+        token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=blocks,
             stop_reason=(response.candidates[0].finish_reason.value.lower())
             if hasattr(response, "candidates") and response.candidates
             else None,
-            prompt_tokens_used=usage_metadata.prompt_token_count
-            if usage_metadata
-            else 0,
-            completion_tokens_used=usage_metadata.candidates_token_count
-            if usage_metadata
-            else 0,
-            cached_tokens_used=usage_metadata.cached_content_token_count
-            if usage_metadata
-            else 0,
+            usage=token_usage,
         )

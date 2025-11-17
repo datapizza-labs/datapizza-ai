@@ -9,7 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from datapizza.core.cache import Cache, cacheable
-from datapizza.core.clients.response import ClientResponse
+from datapizza.core.clients.models import ClientResponse
 from datapizza.core.models import ChainableProducer, PipelineComponent
 from datapizza.memory import Memory
 from datapizza.memory.memory_adapter import MemoryAdapter
@@ -707,6 +707,15 @@ class Client(ChainableProducer):
     def _as_module_component(self):
         return InferenceClientModule(self)
 
+    def as_inference_module_component(self):
+        return self._as_module_component()
+
+    def as_stream_module_component(self):
+        return StreamInferenceClientModule(self)
+
+    def as_structured_response_module_component(self):
+        return StructuredResponseInferenceClientModule(self)
+
 
 class InferenceClientModule(PipelineComponent):
     def __init__(self, client: Client):
@@ -717,6 +726,17 @@ class InferenceClientModule(PipelineComponent):
 
     async def _a_run(self, **kwargs):
         return await self.client.a_invoke(**kwargs)
+
+
+class StructuredResponseInferenceClientModule(PipelineComponent):
+    def __init__(self, client: Client):
+        self.client = client
+
+    def _run(self, **kwargs):
+        return self.client.structured_response(**kwargs)
+
+    async def _a_run(self, **kwargs):
+        return self.client.a_structured_response(**kwargs)
 
 
 class StreamInferenceClientModule(PipelineComponent):

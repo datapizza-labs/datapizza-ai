@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai"
-version = "0.0.2"
+version = "0.0.9"
 description = "Build reliable Gen AI solutions without overhead"
 readme = "README.md"
 license = {text = "MIT"}
@@ -43,6 +43,7 @@ members = [
 
     # Clients
     "datapizza-ai-clients/datapizza-ai-clients-anthropic",
+    "datapizza-ai-clients/datapizza-ai-clients-bedrock",
     "datapizza-ai-clients/datapizza-ai-clients-google",
     "datapizza-ai-clients/datapizza-ai-clients-mistral",
     "datapizza-ai-clients/datapizza-ai-clients-openai",
@@ -52,6 +53,7 @@ members = [
     "datapizza-ai-embedders/cohere",
     "datapizza-ai-embedders/fastembedder",
     "datapizza-ai-embedders/google",
+    "datapizza-ai-embedders/mistral",
     "datapizza-ai-embedders/openai",
 
     # Modules
@@ -70,7 +72,9 @@ members = [
     # Tools
     "datapizza-ai-tools/duckduckgo",
     "datapizza-ai-tools/sqldatabase",
-    "datapizza-ai-tools/filesystem"
+    "datapizza-ai-tools/filesystem",
+    "datapizza-ai-tools/web_fetch",
+
 ]
 
 [tool.uv.sources]
@@ -88,6 +92,7 @@ datapizza-ai-clients-openai-like = {workspace = true}
 datapizza-ai-embedders-cohere = {workspace = true}
 datapizza-ai-embedders-fastembedder = {workspace = true}
 datapizza-ai-embedders-google = {workspace = true}
+datapizza-ai-embedders-mistral = {workspace = true}
 datapizza-ai-embedders-openai = {workspace = true}
 
 # Modules
@@ -107,6 +112,7 @@ datapizza-ai-cache-redis = {workspace = true}
 datapizza-ai-tools-duckduckgo = {workspace = true}
 datapizza-ai-tools-filesystem = {workspace = true}
 datapizza-ai-tools-sqldatabase = {workspace = true}
+datapizza-ai-tools-web-fetch = {workspace = true}
 
 
 # Hatch build configuration

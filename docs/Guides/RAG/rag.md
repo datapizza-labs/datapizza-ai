@@ -38,7 +38,7 @@ from datapizza.vectorstores.qdrant import QdrantVectorstore
 vectorstore = QdrantVectorstore(location=":memory:")
 vectorstore.create_collection(
     "my_documents",
-    vector_config=[VectorConfig(name="embedding", dimensions=1536)]
+    vector_config=[VectorConfig(name="text-embedding-3-small", dimensions=1536)]
 )
 
 embedder_client = OpenAIEmbedder(
@@ -132,6 +132,7 @@ The DagPipeline enables complex retrieval workflows with query rewriting, embedd
 
 ```python
 from datapizza.clients.openai import OpenAIClient
+from datapizza.core.vectorstore import VectorConfig
 from datapizza.embedders.openai import OpenAIEmbedder
 from datapizza.modules.prompt import ChatPromptTemplate
 from datapizza.modules.rewriters import ToolRewriter

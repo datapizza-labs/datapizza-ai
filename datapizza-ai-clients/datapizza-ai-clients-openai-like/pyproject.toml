@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-openai-like"
-version = "0.0.3"
+version = "0.0.8"
 description = "OpenAI client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,9 +20,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1",
+    "datapizza-ai-core>=0.0.7,<0.1.0",
     "httpx>=0.28.1",
-    "openai>=1.63.2,<2.0.0",
+    "openai>=2.0.0,<3.0.0",
 ]
 
 # Development dependencies

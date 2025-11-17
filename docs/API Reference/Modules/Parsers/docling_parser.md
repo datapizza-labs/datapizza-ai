@@ -72,3 +72,110 @@ for section in document.children:
         elif child.node_type.name == "FIGURE":
             print(f"  Figure: {child.metadata.get('docling_label', 'Image')}")
 ```
+
+### Configured OCR Document Processing
+
+```python
+from datapizza.modules.parsers.docling import DoclingParser
+from datapizza.modules.parsers.docling.ocr_options import OCROptions, OCREngine
+
+# Configure parser with EasyOCR (default, backward compatible)
+parser = DoclingParser()
+document = parser.parse("document.pdf")
+
+# Configure parser with Tesseract OCR for Italian language
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["ita"],
+)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("italian_document.pdf")
+
+# Configure parser with Tesseract for multiple languages
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["eng", "fra"],  # English and French
+)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("multilingual_document.pdf")
+
+# Configure parser with Tesseract for Italian and English
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["ita", "eng"],
+)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("italian_english_document.pdf")
+
+# Configure parser with automatic language detection
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["auto"],
+)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("mixed_language_document.pdf")
+
+# Disable OCR completely (for documents without text that needs OCR)
+ocr_config = OCROptions(engine=OCREngine.NONE)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("native_text_document.pdf")
+
+# Enable custom EasyOCR configuration
+ocr_config = OCROptions(
+    engine=OCREngine.EASY_OCR,
+    easy_ocr_force_full_page=False,  # Process only text-light regions
+)
+parser = DoclingParser(ocr_options=ocr_config)
+document = parser.parse("document.pdf")
+
+# Parse with JSON output for debugging
+ocr_config = OCROptions(engine=OCREngine.TESSERACT, tesseract_lang=["ita", "eng"])
+parser = DoclingParser(
+    json_output_dir="./docling_debug",
+    ocr_options=ocr_config,
+)
+document = parser.parse("document.pdf")
+# Intermediate Docling JSON will be saved to ./docling_debug/document.json
+```
+
+### Tesseract Language Options
+
+When using Tesseract OCR, you can specify languages in the `tesseract_lang` parameter as a list:
+
+**Single Language:**
+```python
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["eng"],  # English
+)
+```
+
+**Multiple Languages:**
+```python
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["eng", "ita", "fra"],  # English, Italian, French
+)
+```
+
+**Automatic Language Detection:**
+```python
+ocr_config = OCROptions(
+    engine=OCREngine.TESSERACT,
+    tesseract_lang=["auto"],  # Auto-detect language
+)
+```
+
+**Common Language Codes:**
+- `"eng"` - English
+- `"ita"` - Italian
+- `"fra"` - French
+- `"deu"` - German
+- `"spa"` - Spanish
+- `"por"` - Portuguese
+- `"chi_sim"` - Simplified Chinese
+- `"chi_tra"` - Traditional Chinese
+- `"jpn"` - Japanese
+- `"auto"` - Automatic detection
+
+For a complete list of supported languages, refer to [Tesseract documentation](https://github.com/UB-Mannheim/tesseract/wiki).

@@ -98,3 +98,100 @@ def test_ingestion_pipeline():
     )
 
     assert len(data) == 1
+
+
+def test_ingestion_pipeline_with_multiple_files():
+    """Test issue #63: IngestionPipeline should handle list of file paths."""
+    from datapizza.modules.splitters.text_splitter import TextSplitter
+
+    class FakeEmbedder(PipelineComponent):
+        def _run(self, nodes: list[Chunk]):
+            for node in nodes:
+                node.embeddings = [
+                    DenseEmbedding(name="embedding", vector=[0.0] * 1536)
+                ]
+            return nodes
+
+    qdrant_client = QdrantVectorstore(location=":memory:")
+    qdrant_client.create_collection(
+        "test_multi",
+        vector_config=[VectorConfig(name="embedding", dimensions=1536)],
+    )
+
+    pipeline = IngestionPipeline(
+        modules=[
+            TextSplitter(max_char=300),
+            FakeEmbedder(),
+        ],
+        vector_store=qdrant_client,
+        collection_name="test_multi",
+    )
+
+    # Test with list of strings
+    pipeline.run(
+        ["Primo documento", "Secondo documento", "Terzo documento"],
+        metadata={"batch": "test"},
+    )
+
+    data = qdrant_client.search(
+        collection_name="test_multi",
+        query_vector=[0.0] * 1536,
+        k=10,
+    )
+
+    assert len(data) == 3, f"Expected 3 chunks, got {len(data)}"
+
+
+def test_ingestion_pipeline_list_validation():
+    """Test that invalid list elements are rejected."""
+    from datapizza.modules.splitters.text_splitter import TextSplitter
+
+    pipeline = IngestionPipeline(
+        modules=[TextSplitter(max_char=300)],
+    )
+
+    # Should raise ValueError for non-string elements
+    try:
+        pipeline.run([123, "valid_string", None])
+        raise AssertionError("Should have raised ValueError")
+    except ValueError as e:
+        assert "must be strings" in str(e).lower()
+
+
+def test_ingestion_pipeline_empty_list():
+    """Test that empty list is handled gracefully."""
+    from datapizza.modules.splitters.text_splitter import TextSplitter
+
+    class FakeEmbedder(PipelineComponent):
+        def _run(self, nodes: list[Chunk]):
+            for node in nodes:
+                node.embeddings = [
+                    DenseEmbedding(name="embedding", vector=[0.0] * 1536)
+                ]
+            return nodes
+
+    qdrant_client = QdrantVectorstore(location=":memory:")
+    qdrant_client.create_collection(
+        "test_empty",
+        vector_config=[VectorConfig(name="embedding", dimensions=1536)],
+    )
+
+    pipeline = IngestionPipeline(
+        modules=[
+            TextSplitter(max_char=300),
+            FakeEmbedder(),
+        ],
+        vector_store=qdrant_client,
+        collection_name="test_empty",
+    )
+
+    # Should handle empty list without errors
+    pipeline.run([])
+
+    data = qdrant_client.search(
+        collection_name="test_empty",
+        query_vector=[0.0] * 1536,
+        k=10,
+    )
+
+    assert len(data) == 0, "Should have 0 chunks for empty list"
