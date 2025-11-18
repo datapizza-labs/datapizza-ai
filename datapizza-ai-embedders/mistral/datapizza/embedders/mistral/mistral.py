@@ -28,22 +28,21 @@ class MistralEmbedder(BaseEmbedder):
         if not self.a_client:
             self.a_client = mistralai.Mistral(api_key=self.api_key)
 
-    def embed(self, text: str | list[str], **kwargs
+    def embed(self, text: str | list[str], model_name: str | None = None
     ) -> list[float] | list[list[float]]:
         """Embed text into dense embeddings using Mistral API.
 
         Args:
             text: Single text string or list of text strings to embed.
-            **kwargs: Additional keyword arguments.
-                model_name (str | None): Optional model name override. If not provided, uses instance model_name.
+            model_name: Optional model name override. If not provided, uses instance model_name.
 
         Returns:
             list[float] | list[list[float]]: Single embedding vector for string input, or list of embeddings for list input.
 
         Raises:
-            ValueError: If model name is not provided in kwargs or instance.
+            ValueError: If model name is not provided as argument or instance.
         """
-        model = kwargs["model_name"] or self.model_name
+        model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")
 
@@ -60,22 +59,21 @@ class MistralEmbedder(BaseEmbedder):
         return embeddings[0] if isinstance(text, str) else embeddings
 
     async def a_embed(
-        self, text: str | list[str], **kwargs
+        self, text: str | list[str], model_name: str | None = None
     ) -> list[float] | list[list[float]]:
         """Embed text into dense embeddings using Mistral API asynchronously.
 
         Args:
             text: Single text string or list of text strings to embed.
-            **kwargs: Additional keyword arguments.
-                model_name (str | None): Optional model name override. If not provided, uses instance model_name.
+            model_name: Optional model name override. If not provided, uses instance model_name.
 
         Returns:
             list[float] | list[list[float]]: Single embedding vector for string input, or list of embeddings for list input.
 
         Raises:
-            ValueError: If model name is not provided in kwargs or instance.
+            ValueError: If model name is not provided as argument or instance.
         """
-        model = kwargs['model_name'] or self.model_name
+        model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")
 
