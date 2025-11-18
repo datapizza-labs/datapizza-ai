@@ -6,7 +6,7 @@ The `IngestionPipeline` provides a streamlined way to process documents, transfo
 
 ## Core Concepts
 
--   **Components**: These are the processing steps in the pipeline, typically inheriting from `datapizza.core.models.PipelineComponent`. Each component implements a `process` method to perform a specific task like parsing a document, splitting text, or generating embeddings. Components are executed sequentially via their `__call__` method in the order they are provided.
+-   **Components**: These are the processing steps in the pipeline, typically inheriting from `datapizza.core.models.PipelineComponent`. Each component implements a `_run` method to perform a specific task like parsing a document, splitting text, or generating embeddings. Components are executed sequentially via their `__call__` method in the order they are provided.
 -   **Vector Store**: An optional component responsible for storing the final nodes and their embeddings.
 -   **Nodes**: The fundamental unit of data passed between components. A node usually represents a chunk of text (e.g., a paragraph, a table summary) along with its associated metadata and embeddings.
 
