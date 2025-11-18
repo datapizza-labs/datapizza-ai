@@ -97,3 +97,6 @@ class RecursiveSplitter(Splitter):
             result.append(self._nodes_to_chunk(list_nodes))
 
         return result
+
+    async def a_split(self, node: Node) -> list[Chunk]:
+        return self.split(node)
