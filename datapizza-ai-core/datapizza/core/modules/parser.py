@@ -16,11 +16,11 @@ class Parser(PipelineComponent):
     def parse(self, text: str, metadata: dict | None = None) -> Node:
         pass
 
-    def a_parse(self, text: str, metadata: dict | None = None) -> Node:
+    async def a_parse(self, text: str, metadata: dict | None = None) -> Node:
         raise NotImplementedError
 
     def _run(self, text: str, metadata: dict | None = None) -> Node:
         return self.parse(text, metadata)
 
     async def _a_run(self, text: str, metadata: dict | None = None) -> Node:
-        return self.a_parse(text, metadata)
+        return await self.a_parse(text, metadata)

@@ -26,7 +26,7 @@ class NodeCaptioner(PipelineComponent):
         return self.caption(node)
 
     async def _a_run(self, node: Node):
-        return self.a_caption(node)
+        return await self.a_caption(node)
 
 
 class Captioner(PipelineComponent):
