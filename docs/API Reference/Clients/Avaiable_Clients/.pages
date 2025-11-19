@@ -2,5 +2,6 @@ nav:
     - openai.md
     - google.md
     - anthropic.md
+    - AzureOpenai.md
     - mistral.md
     - openai-like.md
