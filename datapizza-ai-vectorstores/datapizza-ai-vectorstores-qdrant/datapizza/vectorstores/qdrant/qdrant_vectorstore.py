@@ -204,6 +204,7 @@ class QdrantVectorstore(Vectorstore):
             list[Chunk]: The list of chunks found in the collection.
         """
         client = self.get_client()
+        using = None
 
         if isinstance(query_vector, list) and all(
             isinstance(v, float) for v in query_vector
@@ -217,33 +218,31 @@ class QdrantVectorstore(Vectorstore):
                         f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
                     )
                 vector_name = str(vectors_config[0])
-            qry = (vector_name, query_vector) if vector_name else query_vector
+            using = vector_name
+            qry = query_vector
 
         elif isinstance(query_vector, dict):
             indices = query_vector.get("indices", [])
             values = query_vector.get("values", [])
-            qry = models.NamedSparseVector(
-                name=vector_name or "default",
-                vector=models.SparseVector(indices=indices, values=values),
-            )
+            qry = (models.SparseVector(indices=indices, values=values),)
+            using = vector_name or "default"
 
         elif isinstance(query_vector, SparseEmbedding):
-            qry = models.NamedSparseVector(
-                name=query_vector.name,
-                vector=models.SparseVector(
-                    indices=query_vector.indices, values=query_vector.values
-                ),
+            using = query_vector.name
+            qry = models.SparseVector(
+                indices=query_vector.indices, values=query_vector.values
             )
         else:
             raise ValueError(f"Unsupported query vector type: {type(query_vector)}")
 
-        hits = client.search(
+        hits = client.query_points(
             collection_name=collection_name,
-            query_vector=qry,
+            query=qry,
+            using=using,
             limit=k,  # Return k closest points
             **kwargs,
         )
-        return self._point_to_chunk(hits)
+        return self._point_to_chunk(hits.points)
 
     async def a_search(
         self,
@@ -255,21 +254,54 @@ class QdrantVectorstore(Vectorstore):
     ) -> list[Chunk]:
         """Search for chunks in a collection by their query vector."""
         client = self._get_a_client()
+        using = None
 
-        qry = (vector_name, query_vector) if vector_name else query_vector
+        if isinstance(query_vector, list) and all(
+            isinstance(v, float) for v in query_vector
+        ):
+            if not vector_name:
+                collection = await client.get_collection(collection_name)
+                vectors_config = list(collection.config.params.vectors)
+                if vectors_config and len(vectors_config) > 1:
+                    raise ValueError(
+                        f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
+                    )
+                vector_name = str(vectors_config[0])
+            using = vector_name
+            qry = query_vector
 
-        hits = await client.search(
+        elif isinstance(query_vector, dict):
+            indices = query_vector.get("indices", [])
+            values = query_vector.get("values", [])
+            qry = (models.SparseVector(indices=indices, values=values),)
+            using = vector_name or "default"
+
+        elif isinstance(query_vector, SparseEmbedding):
+            using = query_vector.name
+            qry = models.SparseVector(
+                indices=query_vector.indices, values=query_vector.values
+            )
+        else:
+            raise ValueError(f"Unsupported query vector type: {type(query_vector)}")
+
+        hits = await client.query_points(
             collection_name=collection_name,
-            query_vector=qry,
+            query=qry,
+            using=using,
             limit=k,  # Return k closest points
             **kwargs,
         )
-        return self._point_to_chunk(hits)
+        return self._point_to_chunk(hits.points)
 
     def get_collections(self):
         """Get all collections in Qdrant."""
         client = self.get_client()
         return client.get_collections()
+
+    async def a_get_collections(self):
+        """Get all collections in Qdrant."""
+        client = self._get_a_client()
+        return await client.get_collections()
 
     def create_collection(
         self, collection_name: str, vector_config: list[VectorConfig], **kwargs

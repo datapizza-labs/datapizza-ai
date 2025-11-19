@@ -156,3 +156,65 @@ def test_collection_with_multiple_vectors(vectorstore):
         query_vector=SparseEmbedding(name="sparse", values=[0.1], indices=[1]),
     )
     assert len(res_sparse_no_name) == 1
+
+
+def test_search_with_dense_vector(vectorstore):
+    vectorstore.create_collection(
+        collection_name="dense_test",
+        vector_config=[VectorConfig(dimensions=1536, name="dense_emb_name")],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello world",
+                embeddings=[DenseEmbedding(name="dense_emb_name", vector=[0.0] * 1536)],
+            )
+        ],
+        collection_name="dense_test",
+    )
+
+    results = vectorstore.search(
+        collection_name="dense_test",
+        query_vector=[0.0] * 1536,
+        vector_name="dense_emb_name",
+    )
+    assert len(results) == 1
+
+    res_no_name = vectorstore.search(
+        collection_name="dense_test",
+        query_vector=[0.0] * 1536,
+    )
+    assert len(res_no_name) == 1
+
+
+def test_search_with_multiple_dense_vector(vectorstore):
+    vectorstore.create_collection(
+        collection_name="dense_test_multiple",
+        vector_config=[
+            VectorConfig(dimensions=1536, name="dense_emb_name_1"),
+            VectorConfig(dimensions=1536, name="dense_emb_name_2"),
+        ],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello world",
+                embeddings=[
+                    DenseEmbedding(name="dense_emb_name_1", vector=[0.0] * 1536),
+                    DenseEmbedding(name="dense_emb_name_2", vector=[0.0] * 1536),
+                ],
+            )
+        ],
+        collection_name="dense_test_multiple",
+    )
+
+    results = vectorstore.search(
+        collection_name="dense_test_multiple",
+        query_vector=[0.0] * 1536,
+        vector_name="dense_emb_name_1",
+    )
+    assert len(results) == 1

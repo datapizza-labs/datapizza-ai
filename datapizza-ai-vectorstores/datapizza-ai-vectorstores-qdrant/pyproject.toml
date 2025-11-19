@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-vectorstores-qdrant"
-version = "0.0.4"
+version = "0.0.5"
 description = "Qdrant vectorstore for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.0.6,<0.1.0",
-    "qdrant-client>=1.13.3,<2.0.0",
+    "qdrant-client>=1.16.0,<2.0.0",
 ]
 
 # Development dependencies
