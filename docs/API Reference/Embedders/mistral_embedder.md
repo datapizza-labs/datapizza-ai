@@ -43,3 +43,34 @@ async def embed_async():
 # Run async function
 embedding = asyncio.run(embed_async())
 ```
+
+## Ingestion
+
+Set the batch size to a conservative value (eg: 150) to avoid the error `Too many inputs in request`:
+
+
+```python
+                ingestion_pipeline = IngestionPipeline(
+                    modules=[
+                        # some modules
+                        ChunkEmbedder(
+                            client=MistralEmbedder(
+                                api_key="some_key",
+                                model_name="mistral-embed",
+                            ),
+                            batch_size=150  # Mistral API limit (conservative)
+                        ),  
+                    ],
+                )
+```
+
+### The full error
+```json
+{
+  "object": "error",
+  "message": "Too many inputs in request, split into more batches.",
+  "type": "invalid_request_prompt",
+  "param": null,
+  "code": "3210"
+}
+```

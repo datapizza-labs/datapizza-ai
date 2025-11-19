@@ -1,4 +1,4 @@
-# Google Embedder
+# Mistral AI embedder
 
 Mistral AI embedder implementation for datapizza-ai
 
