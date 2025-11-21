@@ -1,9 +1,12 @@
 from abc import abstractmethod
 
 from datapizza.core.models import PipelineComponent
+from datapizza.type import SparseEmbedding
+from typing import TypeVar, Generic
 
+T = TypeVar('T')
 
-class BaseEmbedder(PipelineComponent):
+class BaseEmbedder(PipelineComponent,Generic[T]):
     client: object
     a_client: object
 
@@ -33,7 +36,7 @@ class BaseEmbedder(PipelineComponent):
         return await self.a_embed(text)
 
     @abstractmethod
-    def embed(self, text: str | list[str], **kwargs) -> list[float]:
+    def embed(self, text: str | list[str], **kwargs) -> T | list[T]:
         pass
 
     async def a_embed(self, text: str | list[str], **kwargs):

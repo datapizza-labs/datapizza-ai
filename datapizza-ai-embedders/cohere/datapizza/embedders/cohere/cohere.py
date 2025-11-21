@@ -56,7 +56,7 @@ class CohereEmbedder(BaseEmbedder):
 
     async def a_embed(
         self, text: str | list[str], model_name: str | None = None
-    ) -> list[float]:
+    ) -> list[float] | list[list[float]]:
         model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")

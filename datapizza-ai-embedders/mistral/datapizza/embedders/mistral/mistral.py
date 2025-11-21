@@ -20,26 +20,36 @@ class MistralEmbedder(BaseEmbedder):
         import mistralai
 
         if not self.client:
-            self.client: mistralai.Mistral = mistralai.Mistral(api_key=self.api_key)
+            self.client = mistralai.Mistral(api_key=self.api_key)
 
     def _set_a_client(self) -> None:
         import mistralai
 
         if not self.a_client:
-            self.a_client: mistralai.Mistral = mistralai.Mistral(api_key=self.api_key)
+            self.a_client = mistralai.Mistral(api_key=self.api_key)
 
-    def embed(
-        self, text: str | list[str], model_name: str | None = None
+    def embed(self, text: str | list[str], model_name: str | None = None
     ) -> list[float] | list[list[float]]:
-        import mistralai
+        """Embed text into dense embeddings using Mistral API.
+
+        Args:
+            text: Single text string or list of text strings to embed.
+            model_name: Optional model name override. If not provided, uses instance model_name.
+
+        Returns:
+            list[float] | list[list[float]]: Single embedding vector for string input, or list of embeddings for list input.
+
+        Raises:
+            ValueError: If model name is not provided as argument or instance.
+        """
         model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")
 
         texts = [text] if isinstance(text, str) else text
 
-        client: mistralai.Mistral = self._get_client()
-        embedding_response: mistralai.EmbeddingResponse = client.embeddings.create(
+        client = self._get_client()
+        embedding_response = client.embeddings.create(
             inputs=texts,
             model=model,
             server_url=self.base_url
@@ -51,15 +61,26 @@ class MistralEmbedder(BaseEmbedder):
     async def a_embed(
         self, text: str | list[str], model_name: str | None = None
     ) -> list[float] | list[list[float]]:
-        import mistralai
+        """Embed text into dense embeddings using Mistral API asynchronously.
+
+        Args:
+            text: Single text string or list of text strings to embed.
+            model_name: Optional model name override. If not provided, uses instance model_name.
+
+        Returns:
+            list[float] | list[list[float]]: Single embedding vector for string input, or list of embeddings for list input.
+
+        Raises:
+            ValueError: If model name is not provided as argument or instance.
+        """
         model = model_name or self.model_name
         if not model:
             raise ValueError("Model name is required.")
 
         texts = [text] if isinstance(text, str) else text
 
-        client: mistralai.Mistral = self._get_a_client()
-        embedding_response: mistralai.EmbeddingResponse  = await client.embeddings.create_async(
+        client = self._get_a_client()
+        embedding_response = await client.embeddings.create_async(
             inputs=texts,
             model=model,
             server_url=self.base_url
