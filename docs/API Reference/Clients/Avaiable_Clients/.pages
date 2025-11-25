@@ -5,3 +5,4 @@ nav:
     - AzureOpenai.md
     - mistral.md
     - openai-like.md
+    - watsonx.md

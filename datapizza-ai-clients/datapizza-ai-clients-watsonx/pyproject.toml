@@ -1,0 +1,40 @@
+# Build system configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Project metadata
+[project]
+name = "datapizza-ai-clients-watsonx"
+version = "0.0.1"
+description = "Ibm WatsonX client for the datapizza-ai framework"
+readme = "README.md"
+license = {text = "MIT"}
+
+requires-python = ">=3.11.0,<4"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "datapizza-ai-core>=0.0.7,<0.1.0",
+    "ibm-watsonx-ai>=1.4.0,<2.0.0"
+]
+
+# Development dependencies
+[dependency-groups]
+dev = [
+    "deptry>=0.23.0",
+    "pytest",
+    "ruff>=0.11.5",
+]
+
+# Hatch build configuration
+[tool.hatch.build.targets.sdist]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
+
+[tool.hatch.build.targets.wheel]
+include = ["datapizza"]
+exclude = ["**/BUILD"]
