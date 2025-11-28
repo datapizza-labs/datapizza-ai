@@ -35,11 +35,12 @@ class ToolRewriter(Rewriter):
         self.tool_choice = tool_choice
         self.tool_output_name = tool_output_name
 
-    def rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
+    def rewrite(self, user_prompt: str, memory: Memory | None = None, **kwargs) -> str:
         """
         Args:
             user_prompt: The user query to rewrite.
             memory: The memory to use for the rewrite.
+            kwargs: Additional arguments to pass to the client.
 
         Returns:
             The rewritten query.
@@ -50,6 +51,7 @@ class ToolRewriter(Rewriter):
             memory=memory,
             tool_choice=self.tool_choice,
             tools=[self.tool],
+            **kwargs,
         )
 
         if len(response.content) != 1:
@@ -64,11 +66,14 @@ class ToolRewriter(Rewriter):
 
             return response.content[0].arguments[self.tool_output_name]
 
-    async def a_rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
+    async def a_rewrite(
+        self, user_prompt: str, memory: Memory | None = None, **kwargs
+    ) -> str:
         """
         Args:
             user_prompt: The user query to rewrite.
             memory: The memory to use for the rewrite.
+            kwargs: Additional arguments to pass to the client.
 
         Returns:
             The rewritten query.
@@ -79,6 +84,7 @@ class ToolRewriter(Rewriter):
             memory=memory,
             tool_choice=self.tool_choice,
             tools=[self.tool],
+            **kwargs,
         )
         if len(response.content) != 1:
             raise ValueError(

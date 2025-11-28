@@ -16,8 +16,10 @@ class Rewriter(PipelineComponent):
     async def a_rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
         raise NotImplementedError
 
-    def _run(self, user_prompt: str, memory: Memory | None = None) -> str:
-        return self.rewrite(user_prompt, memory)
+    def _run(self, user_prompt: str, memory: Memory | None = None, **kwargs) -> str:
+        return self.rewrite(user_prompt, memory, **kwargs)
 
-    async def _a_run(self, user_prompt: str, memory: Memory | None = None) -> str:
-        return await self.a_rewrite(user_prompt, memory)
+    async def _a_run(
+        self, user_prompt: str, memory: Memory | None = None, **kwargs
+    ) -> str:
+        return await self.a_rewrite(user_prompt, memory, **kwargs)

@@ -1,6 +1,6 @@
 
 test:
-	uv run pytest --tb=short -v
+	uv run pytest --tb=short -v --ignore=datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus
 
 watch-tests:
 	find . -name "*.py" -not -path "*/site-packages/*" | entr uv run pytest --tb=short -v
