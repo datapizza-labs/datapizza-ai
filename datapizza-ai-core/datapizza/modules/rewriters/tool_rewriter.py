@@ -18,9 +18,11 @@ class ToolRewriter(Rewriter):
         tool: Tool | None = None,
         tool_choice: str = "required",
         tool_output_name: str = "query",
+        **invoke_args,
     ):
         self.client = client
         self.system_prompt = system_prompt
+        self.invoke_args = invoke_args or {}
 
         if tool is None:
             # using a default tool
@@ -35,7 +37,7 @@ class ToolRewriter(Rewriter):
         self.tool_choice = tool_choice
         self.tool_output_name = tool_output_name
 
-    def rewrite(self, user_prompt: str, memory: Memory | None = None, **kwargs) -> str:
+    def rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
         """
         Args:
             user_prompt: The user query to rewrite.
@@ -51,7 +53,7 @@ class ToolRewriter(Rewriter):
             memory=memory,
             tool_choice=self.tool_choice,
             tools=[self.tool],
-            **kwargs,
+            **self.invoke_args,
         )
 
         if len(response.content) != 1:
@@ -66,9 +68,7 @@ class ToolRewriter(Rewriter):
 
             return response.content[0].arguments[self.tool_output_name]
 
-    async def a_rewrite(
-        self, user_prompt: str, memory: Memory | None = None, **kwargs
-    ) -> str:
+    async def a_rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
         """
         Args:
             user_prompt: The user query to rewrite.
@@ -84,7 +84,7 @@ class ToolRewriter(Rewriter):
             memory=memory,
             tool_choice=self.tool_choice,
             tools=[self.tool],
-            **kwargs,
+            **self.invoke_args,
         )
         if len(response.content) != 1:
             raise ValueError(
