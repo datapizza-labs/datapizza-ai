@@ -52,7 +52,13 @@ class TextSplitter(Splitter):
         while start < text_length:
             end = min(start + self.max_char, text_length)
             chunk_text = text[start:end]
-            chunks.append(Chunk(id=str(uuid.uuid4()), text=chunk_text, metadata={}))
+            chunks.append(
+                Chunk(
+                    id=str(uuid.uuid4()),
+                    text=chunk_text,
+                    metadata={"start_char": start, "end_char": end},
+                )
+            )
 
             if end >= text_length:
                 break

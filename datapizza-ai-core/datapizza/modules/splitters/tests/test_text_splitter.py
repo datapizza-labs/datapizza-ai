@@ -16,5 +16,9 @@ def test_text_splitter_with_overlap():
     assert len(chunks) == 3
 
     assert chunks[0].text == "This is a "
+    assert chunks[0].metadata.get("start_char") == 0
+    assert chunks[0].metadata.get("end_char") == 10
     assert chunks[1].text == "a test str"
+    assert chunks[1].metadata.get("start_char") == 8
+    assert chunks[1].metadata.get("end_char") == 18
     assert chunks[2].text == "tring"
