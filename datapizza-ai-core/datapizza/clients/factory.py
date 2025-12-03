@@ -11,7 +11,7 @@ class Provider(str, Enum):
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"
     AZURE_OPENAI = "azure_openai"
-
+    WATSONX = "watsonx"
 
 class ClientFactory:
     """Factory for creating LLM clients"""
@@ -123,6 +123,24 @@ class ClientFactory:
                     ) from e
 
                 return AzureOpenAIClient(
+                    api_key=api_key,
+                    model=model,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    **kwargs,
+                )
+
+            case Provider.WATSONX:
+                try:
+                    from datapizza.clients.watsonx import (  # type: ignore
+                        WatsonXClient,
+                    )
+                except ImportError as e:
+                    raise ImportError(
+                        "IBM WatsonX client is not installed. Please install it with `pip install datapizza-ai-clients-watsonx`"
+                    ) from e
+
+                return WatsonXClient(
                     api_key=api_key,
                     model=model,
                     system_prompt=system_prompt,
