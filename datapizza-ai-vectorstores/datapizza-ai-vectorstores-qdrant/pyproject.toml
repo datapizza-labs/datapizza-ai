@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-vectorstores-qdrant"
-version = "0.0.5"
+version = "0.0.6"
 description = "Qdrant vectorstore for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
