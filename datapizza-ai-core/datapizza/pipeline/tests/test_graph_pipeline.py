@@ -122,6 +122,43 @@ def test_graph_pipeline_with_stream():
     assert isinstance(next(result.get("generator")), ClientResponse)
 
 
+def test_graph_pipeline_isolates_shared_inputs_from_mutation():
+    class Source(PipelineComponent):
+        def _run(self):
+            # Nested structures to ensure deepcopy semantics
+            return {
+                "messages": [{"role": "user", "content": ["hello"]}],
+                "metadata": {"count": 0},
+            }
+
+    class MutatingConsumer(PipelineComponent):
+        def _run(self, input_data):
+            input_data["messages"][0]["content"].append("mutated")
+            input_data["metadata"]["count"] += 1
+            return input_data
+
+    class ObservingConsumer(PipelineComponent):
+        def _run(self, input_data):
+            return input_data
+
+    pipeline = DagPipeline()
+    pipeline.add_module("source", Source())
+    pipeline.add_module("mutator", MutatingConsumer())
+    pipeline.add_module("observer", ObservingConsumer())
+
+    pipeline.connect("source", "mutator", target_key="input_data")
+    pipeline.connect("source", "observer", target_key="input_data")
+
+    results = pipeline.run({})
+
+    assert results["mutator"]["messages"][0]["content"] == ["hello", "mutated"]
+    assert results["mutator"]["metadata"]["count"] == 1
+
+    # The observer should receive an unmutated copy of the source output
+    assert results["observer"]["messages"][0]["content"] == ["hello"]
+    assert results["observer"]["metadata"]["count"] == 0
+
+
 # def test_graph_pipeline_with_a_stream():
 #     pipeline = DagPipeline()
 #
