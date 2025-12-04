@@ -10,6 +10,7 @@ from datapizza.type import (
     EmbeddingFormat,
     SparseEmbedding,
 )
+from pydantic.types import StrictStr
 from qdrant_client import AsyncQdrantClient, QdrantClient, models
 
 log = logging.getLogger(__name__)
@@ -210,14 +211,15 @@ class QdrantVectorstore(Vectorstore):
             isinstance(v, float) for v in query_vector
         ):
             if not vector_name:
-                vectors_config = list(
-                    client.get_collection(collection_name).config.params.vectors
-                )
-                if vectors_config and len(vectors_config) > 1:
-                    raise ValueError(
-                        f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
-                    )
-                vector_name = str(vectors_config[0])
+                collection = client.get_collection(collection_name)
+                vectors = collection.config.params.vectors
+                if vectors and isinstance(vectors, dict):
+                    vectors_config = list[StrictStr](vectors)
+                    if vectors_config and len(vectors_config) > 1:
+                        raise ValueError(
+                            f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
+                        )
+                    vector_name = str(vectors_config[0])
             using = vector_name
             qry = query_vector
 
@@ -261,12 +263,14 @@ class QdrantVectorstore(Vectorstore):
         ):
             if not vector_name:
                 collection = await client.get_collection(collection_name)
-                vectors_config = list(collection.config.params.vectors)
-                if vectors_config and len(vectors_config) > 1:
-                    raise ValueError(
-                        f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
-                    )
-                vector_name = str(vectors_config[0])
+                vectors = collection.config.params.vectors
+                if vectors and isinstance(vectors, dict):
+                    vectors_config = list[StrictStr](vectors)
+                    if vectors_config and len(vectors_config) > 1:
+                        raise ValueError(
+                            f"Vector name not specified and multiple dense vectors are configured. Available vector names: {vectors_config}"
+                        )
+                    vector_name = str(vectors_config[0])
             using = vector_name
             qry = query_vector
 
