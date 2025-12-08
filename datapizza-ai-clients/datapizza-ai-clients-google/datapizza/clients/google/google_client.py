@@ -277,6 +277,7 @@ class GoogleClient(Client):
         thought_block = ThoughtBlock(content="")
 
         usage = TokenUsage()
+        stop_reason = ""
 
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
