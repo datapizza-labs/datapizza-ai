@@ -274,10 +274,10 @@ class GoogleClient(Client):
         )
 
         message_text = ""
+        stop_reason = ""
         thought_block = ThoughtBlock(content="")
 
         usage = TokenUsage()
-        stop_reason = ""
 
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
@@ -358,6 +358,7 @@ class GoogleClient(Client):
 
         usage = TokenUsage()
         message_text = ""
+        stop_reason = ""
         thought_block = ThoughtBlock(content="")
         async for chunk in await self.client.aio.models.generate_content_stream(
             model=self.model_name,
