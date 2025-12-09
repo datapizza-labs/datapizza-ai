@@ -83,22 +83,30 @@ class CohereReranker(Reranker):
             top_n=self.top_n,
         )
 
-        reranked_documents: list[Chunk] = [None] * len(response.results)  # type: ignore
-        filtered_documents = []
+        result_chunks: list[Chunk] = []
 
-        for i, document in enumerate(response.results):
+        for document in response.results:
             index = document.index
             relevance_score = document.relevance_score
 
-            # Apply threshold filtering if specified
-            if self.threshold is None or relevance_score >= self.threshold:
-                if self.threshold is None:
-                    reranked_documents[i] = documents[index]
-                else:
-                    filtered_documents.append(documents[index])
+            if self.threshold is not None and relevance_score < self.threshold:
+                continue
 
-        # Return filtered documents if threshold is applied, otherwise return reranked documents
-        return filtered_documents if self.threshold is not None else reranked_documents
+            original_chunk = documents[index]
+            updated_metadata = {
+                **original_chunk.metadata,
+                "reranker_score": relevance_score,
+            }
+            result_chunks.append(
+                Chunk(
+                    id=original_chunk.id,
+                    text=original_chunk.text,
+                    embeddings=original_chunk.embeddings,
+                    metadata=updated_metadata,
+                )
+            )
+
+        return result_chunks
 
     async def a_rerank(self, query: str, documents: list[Chunk]) -> list[Chunk]:
         """
@@ -111,6 +119,9 @@ class CohereReranker(Reranker):
         Returns:
             The reranked documents.
         """
+        if not documents:
+            return []
+
         client = self._get_a_client()
 
         response = await client.rerank(
@@ -120,19 +131,27 @@ class CohereReranker(Reranker):
             top_n=self.top_n,
         )
 
-        reranked_documents: list[Chunk] = [None] * len(response.results)  # type: ignore
-        filtered_documents = []
+        result_chunks: list[Chunk] = []
 
-        for i, document in enumerate(response.results):
-            index = document.index
-            relevance_score = document.relevance_score
+        for result in response.results:
+            index = result.index
+            score = result.relevance_score
 
             # Apply threshold filtering if specified
-            if self.threshold is None or relevance_score >= self.threshold:
-                if self.threshold is None:
-                    reranked_documents[i] = documents[index]
-                else:
-                    filtered_documents.append(documents[index])
+            if self.threshold is not None and score < self.threshold:
+                continue
 
-        # Return filtered documents if threshold is applied, otherwise return reranked documents
-        return filtered_documents if self.threshold is not None else reranked_documents
+            original_chunk = documents[index]
+
+            # Add reranker_score to metadata
+            updated_metadata = {**original_chunk.metadata, "reranker_score": score}
+            result_chunks.append(
+                Chunk(
+                    id=original_chunk.id,
+                    text=original_chunk.text,
+                    embeddings=original_chunk.embeddings,
+                    metadata=updated_metadata,
+                )
+            )
+
+        return result_chunks
