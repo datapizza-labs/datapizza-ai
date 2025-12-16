@@ -14,6 +14,20 @@ from datapizza.type import (
 )
 
 
+@tool
+def _search_vectorstore(query: str):
+    """
+    Search the vectorstore for the most relevant chunks
+
+    Args:
+        query: The query to search the vectorstore for
+
+    Returns:
+        A list of Chunks that are most relevant to the query
+    """
+    pass
+
+
 class ChatPromptTemplate(Prompt):
     """
     It takes as input a Memory, Chunks, Prompt and creates a Memory
@@ -77,7 +91,7 @@ class ChatPromptTemplate(Prompt):
                     id=tool_id,
                     arguments={"query": retrieval_query},
                     name="search_vectorstore",
-                    tool=Tool(func=self._search_vectorstore),
+                    tool=Tool(func=_search_vectorstore),
                 ),
                 role=ROLE.ASSISTANT,
             )
@@ -86,23 +100,10 @@ class ChatPromptTemplate(Prompt):
             new_memory.add_turn(
                 blocks=FunctionCallResultBlock(
                     id=tool_id,
-                    tool=Tool(func=self._search_vectorstore),
+                    tool=Tool(func=_search_vectorstore),
                     result=formatted_retrieval,
                 ),
                 role=ROLE.TOOL,
             )
 
         return new_memory
-
-    @tool
-    def _search_vectorstore(self, query: str):
-        """
-        Search the vectorstore for the most relevant chunks
-
-        Args:
-            query: The query to search the vectorstore for
-
-        Returns:
-            A list of Chunks that are most relevant to the query
-        """
-        pass
