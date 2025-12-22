@@ -125,7 +125,15 @@ class QdrantVectorstore(Vectorstore):
         vector = {}
         for v in chunk.embeddings:
             if isinstance(v, DenseEmbedding):
-                vector[v.name] = v.vector
+                if v.name is None:
+                    if len(chunk.embeddings) > 1:
+                        raise ValueError(
+                            "There is at least one unnamed vector, even though the chunk has more than one vector"
+                        )
+                    vector = v.vector
+                else:
+                    vector[v.name] = v.vector
+
             elif isinstance(v, SparseEmbedding):
                 vector[v.name] = models.SparseVector(values=v.values, indices=v.indices)
             else:
