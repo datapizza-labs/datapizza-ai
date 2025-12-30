@@ -1,3 +1,4 @@
+import base64
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
@@ -8,6 +9,8 @@ from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
     FunctionCallBlock,
+    Media,
+    MediaBlock,
     Model,
     StructuredBlock,
     TextBlock,
@@ -134,6 +137,18 @@ class GoogleClient(Client):
 
         return google_tools if google_tools else None
 
+    def _mime_to_extension(self, mime_type: str | None) -> str:
+        """Convert MIME type to file extension."""
+        if not mime_type:
+            return "png"
+        mapping = {
+            "image/png": "png",
+            "image/jpeg": "jpg",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        }
+        return mapping.get(mime_type, "png")
+
     def _token_usage_from_metadata(self, usage_metadata: Any | None) -> TokenUsage:
         if not usage_metadata:
             return TokenUsage()
@@ -194,9 +209,11 @@ class GoogleClient(Client):
             system_instruction=system_prompt or self.system_prompt,
             max_output_tokens=max_tokens or None,
             tools=prepared_tools,  # type: ignore
-            tool_config=self._convert_tool_choice(tool_choice)
-            if tools and any(isinstance(tool, Tool) for tool in tools)
-            else None,
+            tool_config=(
+                self._convert_tool_choice(tool_choice)
+                if tools and any(isinstance(tool, Tool) for tool in tools)
+                else None
+            ),
             **kwargs,
         )
 
@@ -232,9 +249,11 @@ class GoogleClient(Client):
             system_instruction=system_prompt or self.system_prompt,
             max_output_tokens=max_tokens or None,
             tools=prepared_tools,  # type: ignore
-            tool_config=self._convert_tool_choice(tool_choice)
-            if tools and any(isinstance(tool, Tool) for tool in tools)
-            else None,
+            tool_config=(
+                self._convert_tool_choice(tool_choice)
+                if tools and any(isinstance(tool, Tool) for tool in tools)
+                else None
+            ),
             **kwargs,
         )
 
@@ -267,9 +286,11 @@ class GoogleClient(Client):
             system_instruction=system_prompt or self.system_prompt,
             max_output_tokens=max_tokens or None,
             tools=prepared_tools,  # type: ignore
-            tool_config=self._convert_tool_choice(tool_choice)
-            if tools and any(isinstance(tool, Tool) for tool in tools)
-            else None,
+            tool_config=(
+                self._convert_tool_choice(tool_choice)
+                if tools and any(isinstance(tool, Tool) for tool in tools)
+                else None
+            ),
             **kwargs,
         )
 
@@ -350,9 +371,11 @@ class GoogleClient(Client):
             system_instruction=system_prompt or self.system_prompt,
             max_output_tokens=max_tokens or None,
             tools=prepared_tools,  # type: ignore
-            tool_config=self._convert_tool_choice(tool_choice)
-            if tools and any(isinstance(tool, Tool) for tool in tools)
-            else None,
+            tool_config=(
+                self._convert_tool_choice(tool_choice)
+                if tools and any(isinstance(tool, Tool) for tool in tools)
+                else None
+            ),
             **kwargs,
         )
 
@@ -432,9 +455,11 @@ class GoogleClient(Client):
                 max_output_tokens=max_tokens,
                 response_mime_type="application/json",
                 tools=prepared_tools,  # type: ignore
-                tool_config=self._convert_tool_choice(tool_choice)
-                if tools and any(isinstance(tool, Tool) for tool in tools)
-                else None,
+                tool_config=(
+                    self._convert_tool_choice(tool_choice)
+                    if tools and any(isinstance(tool, Tool) for tool in tools)
+                    else None
+                ),
                 response_schema=(
                     output_cls.model_json_schema()
                     if hasattr(output_cls, "model_json_schema")
@@ -450,9 +475,11 @@ class GoogleClient(Client):
         token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
-            stop_reason=response.candidates[0].finish_reason.value.lower()
-            if response.candidates[0].finish_reason
-            else None,
+            stop_reason=(
+                response.candidates[0].finish_reason.value.lower()
+                if response.candidates[0].finish_reason
+                else None
+            ),
             usage=token_usage,
         )
 
@@ -480,9 +507,11 @@ class GoogleClient(Client):
                 max_output_tokens=max_tokens,
                 response_mime_type="application/json",
                 tools=prepared_tools,  # type: ignore
-                tool_config=self._convert_tool_choice(tool_choice)
-                if tools and any(isinstance(tool, Tool) for tool in tools)
-                else None,
+                tool_config=(
+                    self._convert_tool_choice(tool_choice)
+                    if tools and any(isinstance(tool, Tool) for tool in tools)
+                    else None
+                ),
                 response_schema=(
                     output_cls.model_json_schema()
                     if hasattr(output_cls, "model_json_schema")
@@ -499,9 +528,11 @@ class GoogleClient(Client):
         token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=[StructuredBlock(content=structured_data)],
-            stop_reason=response.candidates[0].finish_reason.value.lower()
-            if response.candidates[0].finish_reason
-            else None,
+            stop_reason=(
+                response.candidates[0].finish_reason.value.lower()
+                if response.candidates[0].finish_reason
+                else None
+            ),
             usage=token_usage,
         )
 
@@ -589,22 +620,34 @@ class GoogleClient(Client):
                     )
                 )
         else:
-            if hasattr(response, "text") and response.text:
-                blocks.append(TextBlock(content=response.text))
-
-        if hasattr(response, "candidates") and response.candidates:
-            for part in response.candidates[0].content.parts:
-                if not part.text:
-                    continue
-                if hasattr(part, "thought") and part.thought:
-                    blocks.append(ThoughtBlock(content=part.text))
+            if hasattr(response, "candidates") and response.candidates:
+                for part in response.candidates[0].content.parts:
+                    # Handle inline_data (images from generation or code execution)
+                    if hasattr(part, "inline_data") and part.inline_data is not None:
+                        media = Media(
+                            media_type="image",
+                            source_type="base64",
+                            source=base64.b64encode(part.inline_data.data).decode(
+                                "utf-8"
+                            ),
+                            extension=self._mime_to_extension(
+                                part.inline_data.mime_type
+                            ),
+                        )
+                        blocks.append(MediaBlock(media=media))
+                    elif hasattr(part, "thought") and part.thought and part.text:
+                        blocks.append(ThoughtBlock(content=part.text))
+                    elif hasattr(part, "text") and part.text:
+                        blocks.append(TextBlock(content=part.text))
 
         usage_metadata = getattr(response, "usage_metadata", None)
         token_usage = self._token_usage_from_metadata(usage_metadata)
         return ClientResponse(
             content=blocks,
-            stop_reason=(response.candidates[0].finish_reason.value.lower())
-            if hasattr(response, "candidates") and response.candidates
-            else None,
+            stop_reason=(
+                (response.candidates[0].finish_reason.value.lower())
+                if hasattr(response, "candidates") and response.candidates
+                else None
+            ),
             usage=token_usage,
         )
