@@ -11,10 +11,12 @@ class GoogleEmbedder(BaseEmbedder):
         api_key: str,
         model_name: str | None = None,
         task_type: str = "RETRIEVAL_DOCUMENT",
+        output_dimensionality: int = 3072,
     ):
         self.api_key = api_key
         self.model_name = model_name
         self.task_type = task_type
+        self.output_dimensionality = output_dimensionality
 
         self.client = None
         self.a_client = None
@@ -43,7 +45,10 @@ class GoogleEmbedder(BaseEmbedder):
         result = client.models.embed_content(
             model=model,
             contents=texts,
-            config=types.EmbedContentConfig(task_type=self.task_type),
+            config=types.EmbedContentConfig(
+                task_type=self.task_type,
+                output_dimensionality=self.output_dimensionality,
+            ),
         )
 
         res = [embedding.values for embedding in result.embeddings]
@@ -64,7 +69,10 @@ class GoogleEmbedder(BaseEmbedder):
         result = await client.models.embed_content_async(
             model=model,
             contents=texts,
-            config=types.EmbedContentConfig(task_type=self.task_type),
+            config=types.EmbedContentConfig(
+                task_type=self.task_type,
+                output_dimensionality=self.output_dimensionality,
+            ),
         )
 
         res = [embedding.values for embedding in result.embeddings]
