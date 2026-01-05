@@ -66,7 +66,7 @@ class GoogleEmbedder(BaseEmbedder):
 
         client = self._get_a_client()
 
-        result = await client.models.embed_content_async(
+        result = await client.aio.models.embed_content(
             model=model,
             contents=texts,
             config=types.EmbedContentConfig(
