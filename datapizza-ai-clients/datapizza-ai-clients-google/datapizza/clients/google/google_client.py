@@ -1,3 +1,4 @@
+import base64
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
@@ -8,6 +9,8 @@ from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
     FunctionCallBlock,
+    Media,
+    MediaBlock,
     Model,
     StructuredBlock,
     TextBlock,
@@ -589,15 +592,25 @@ class GoogleClient(Client):
                     )
                 )
         else:
-            if hasattr(response, "text") and response.text:
-                blocks.append(TextBlock(content=response.text))
-
-        if hasattr(response, "candidates") and response.candidates:
-            for part in response.candidates[0].content.parts:
-                if not part.text:
-                    continue
-                if hasattr(part, "thought") and part.thought:
-                    blocks.append(ThoughtBlock(content=part.text))
+            if hasattr(response, "candidates") and response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    # Handle inline_data (images from generation or code execution)
+                    if hasattr(part, "inline_data") and part.inline_data is not None:
+                        media = Media(
+                            media_type="image",
+                            source_type="base64",
+                            source=base64.b64encode(part.inline_data.data).decode(
+                                "utf-8"
+                            ),
+                            extension=(part.inline_data.mime_type.split("/")[-1]) 
+                            if part.inline_data.mime_type 
+                            else "png",
+                        )
+                        blocks.append(MediaBlock(media=media))
+                    elif hasattr(part, "thought") and part.thought and part.text:
+                        blocks.append(ThoughtBlock(content=part.text))
+                    elif hasattr(part, "text") and part.text:
+                        blocks.append(TextBlock(content=part.text))
 
         usage_metadata = getattr(response, "usage_metadata", None)
         token_usage = self._token_usage_from_metadata(usage_metadata)
