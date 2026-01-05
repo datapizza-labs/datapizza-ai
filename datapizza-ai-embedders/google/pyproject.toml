@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-embedders-google"
-version = "0.0.3"
+version = "0.0.4"
 description = "Google embedder for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
