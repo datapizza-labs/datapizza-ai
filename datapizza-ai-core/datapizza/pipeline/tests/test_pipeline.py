@@ -23,6 +23,21 @@ class CustomSplitter(PipelineComponent):
         return nodes
 
 
+class SplitterWrapper(PipelineComponent):
+    """A wrapper component that accepts a splitter element for testing elements feature."""
+
+    def __init__(self, splitter: PipelineComponent):
+        self.splitter = splitter
+
+    def _run(self, data):
+        """Delegates to the wrapped splitter."""
+        return self.splitter(data)
+
+    async def _a_run(self, data):
+        """Delegates to the wrapped splitter asynchronously."""
+        return await self.splitter.a_run(data)
+
+
 def test_pipeline():
     pipeline = IngestionPipeline(
         modules=[
@@ -195,3 +210,54 @@ def test_ingestion_pipeline_empty_list():
     )
 
     assert len(data) == 0, "Should have 0 chunks for empty list"
+
+
+def test_pipeline_from_yaml_with_elements():
+    """Test that elements section in YAML config correctly instantiates and injects components."""
+    pipeline = IngestionPipeline().from_yaml(
+        "datapizza-ai-core/datapizza/pipeline/tests/config_with_elements.yaml"
+    )
+
+    # Verify the pipeline has the expected components
+    assert len(pipeline.pipeline.components) == 3
+
+    # The second component should be SplitterWrapper with a TextSplitter element
+    splitter_wrapper = pipeline.pipeline.components[1]
+    # Use class name check because importlib loads from a different module context
+    assert splitter_wrapper.__class__.__name__ == "SplitterWrapper"
+    assert splitter_wrapper.splitter.__class__.__name__ == "TextSplitter"
+    # Verify the element was instantiated with the correct params
+    assert splitter_wrapper.splitter.max_char == 2000
+
+    # Verify collection name
+    assert pipeline.collection_name == "test_elements"
+
+
+def test_pipeline_from_yaml_elements_with_constants():
+    """Test that elements and constants can coexist and both work correctly."""
+    pipeline = IngestionPipeline().from_yaml(
+        "datapizza-ai-core/datapizza/pipeline/tests/config_with_elements.yaml"
+    )
+
+    # Verify constants still work (from the third component - LLMCaptioner)
+    captioner = pipeline.pipeline.components[2]
+    assert (
+        captioner.system_prompt_table
+        == "You are a helpful assistant that captions tables."
+    )
+    assert (
+        captioner.system_prompt_figure
+        == "You are a helpful assistant that captions figures."
+    )
+
+
+def test_pipeline_from_yaml_backward_compatibility():
+    """Test that existing YAML configs without elements section still work."""
+    # This uses the original config.yaml which doesn't have elements section
+    pipeline = IngestionPipeline().from_yaml(
+        "datapizza-ai-core/datapizza/pipeline/tests/config.yaml"
+    )
+
+    # Should work exactly as before
+    assert len(pipeline.pipeline.components) == 4
+    assert pipeline.collection_name == "test"

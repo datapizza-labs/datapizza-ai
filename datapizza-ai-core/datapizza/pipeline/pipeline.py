@@ -1,5 +1,6 @@
 import importlib
 import logging
+from typing import Any
 
 import yaml
 
@@ -10,6 +11,50 @@ from datapizza.core.vectorstore import Vectorstore
 from datapizza.type import Chunk
 
 log = logging.getLogger(__name__)
+
+
+def _replace_element_refs(value: Any, elements: dict[str, Any]) -> Any:
+    """
+    Replace element references (${element_name}) with actual element instances.
+
+    Args:
+        value: The value to process (can be string, dict, list, or any other type)
+        elements: Dictionary mapping element names to their instances
+
+    Returns:
+        The value with element references replaced by actual instances
+    """
+    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+        element_name = value[2:-1]
+        if element_name in elements:
+            return elements[element_name]
+        # If not found in elements, return as-is (might be a constant or env var)
+        return value
+    elif isinstance(value, dict):
+        return {k: _replace_element_refs(v, elements) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_replace_element_refs(item, elements) for item in value]
+    else:
+        return value
+
+
+def _instantiate_element(element_config: dict[str, Any]) -> Any:
+    """
+    Instantiate an element from its configuration.
+
+    Args:
+        element_config: Dictionary with 'type', 'module', and optional 'params' keys
+
+    Returns:
+        The instantiated element
+    """
+    module_path = element_config["module"]
+    class_name = element_config["type"]
+    params = element_config.get("params", {})
+
+    module = importlib.import_module(module_path)
+    class_ = getattr(module, class_name)
+    return class_(**params)
 
 
 class Pipeline:
@@ -178,6 +223,27 @@ class IngestionPipeline:
         """
         Load the ingestion pipeline from a YAML configuration file.
 
+        The YAML configuration supports the following sections:
+        - constants: Key-value pairs for string substitution using ${VAR_NAME} syntax
+        - elements: Reusable component definitions that can be referenced in modules
+        - ingestion_pipeline: The main pipeline configuration with clients, modules, vector_store, and collection_name
+
+        Example elements section:
+            elements:
+                my_embedder:
+                    type: GoogleEmbedder
+                    module: datapizza.embedders.google
+                    params:
+                        max_char: 2000
+
+        Elements can be referenced in module params using ${element_name} syntax:
+            modules:
+                - name: embedder
+                  type: ChunkEmbedder
+                  module: datapizza.embedders
+                  params:
+                      client: "${my_embedder}"
+
         Args:
             config_path (str): Path to the YAML configuration file.
 
@@ -187,8 +253,26 @@ class IngestionPipeline:
         with open(config_path) as file:
             config = yaml.safe_load(file)
 
-        constants = config.get("constants", [])
-        config = replace_env_vars(config, constants)
+        constants = config.get("constants", {})
+        # Use skip_unknown=True to allow element references (like ${my_embedder})
+        # to pass through without being treated as missing env vars
+        config = replace_env_vars(config, constants, skip_unknown=True)
+
+        # Parse and instantiate elements
+        elements = {}
+        if "elements" in config:
+            for element_name, element_config in config["elements"].items():
+                try:
+                    elements[element_name] = _instantiate_element(element_config)
+                except (ImportError, AttributeError) as e:
+                    raise ValueError(
+                        f"Could not load element '{element_name}' "
+                        f"({element_config.get('type', 'N/A')}): {e!s}"
+                    ) from e
+                except KeyError as e:
+                    raise ValueError(
+                        f"Missing required key {e!s} in element configuration: {element_config}"
+                    ) from e
 
         clients = {}
         ingestion_pipeline = config["ingestion_pipeline"]
@@ -210,13 +294,18 @@ class IngestionPipeline:
 
                     params = component_config.get("params", {})
 
+                    # Replace element references in params
+                    params = _replace_element_refs(params, elements)
+
                     if "client" in params:
                         client_name = params["client"]
-                        if client_name not in clients:
-                            raise ValueError(
-                                f"Client '{client_name}' not found in clients configuration"
-                            )
-                        params["client"] = clients[client_name]
+                        # Only do client lookup if it's still a string (not already replaced by element)
+                        if isinstance(client_name, str):
+                            if client_name not in clients:
+                                raise ValueError(
+                                    f"Client '{client_name}' not found in clients configuration"
+                                )
+                            params["client"] = clients[client_name]
 
                     component_instance = class_(**params)
                     components.append(component_instance)
