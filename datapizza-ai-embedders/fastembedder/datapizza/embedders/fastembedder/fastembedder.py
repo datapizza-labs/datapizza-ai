@@ -27,7 +27,7 @@ class FastEmbedder(BaseEmbedder):
         )
 
     def embed(
-        self, text: str | list[str], model_name: str | None = None
+        self, text: str | list[str]
     ) -> SparseEmbedding | list[SparseEmbedding]:
         # fastembed accepts both str and list[str]. Passing the list allows for batch processing.
         embeddings = self.embedder.embed(text)
@@ -45,6 +45,6 @@ class FastEmbedder(BaseEmbedder):
         return results[0]
 
     async def a_embed(
-        self, text: str | list[str], model_name: str | None = None
+        self, text: str | list[str]
     ) -> SparseEmbedding | list[SparseEmbedding]:
-        return await asyncio.to_thread(self.embed, text, model_name)
+        return await asyncio.to_thread(self.embed, text)
