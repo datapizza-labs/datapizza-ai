@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import fastembed
@@ -25,40 +26,25 @@ class FastEmbedder(BaseEmbedder):
             model_name=model_name, cache_dir=cache_dir
         )
 
-    def embed(self, text: str | list[str], model_name: str | None = None) -> SparseEmbedding | list[SparseEmbedding]:
-        if isinstance(text, list):
-            embeddings = [next(iter(self.embedder.embed(t))) for t in text]
-            return [
-                SparseEmbedding(
-                    name=self.embedding_name,
-                    values=embedding.values.tolist(),
-                    indices=embedding.indices.tolist(),
-                )
-                for embedding in embeddings
-            ]
-        else:
-            embedding = next(iter(self.embedder.embed(text)))
-            return SparseEmbedding(
+    def embed(
+        self, text: str | list[str], model_name: str | None = None
+    ) -> SparseEmbedding | list[SparseEmbedding]:
+        # fastembed accepts both str and list[str]. Passing the list allows for batch processing.
+        embeddings = self.embedder.embed(text)
+        results = [
+            SparseEmbedding(
                 name=self.embedding_name,
                 values=embedding.values.tolist(),
                 indices=embedding.indices.tolist(),
             )
+            for embedding in embeddings
+        ]
 
-    async def a_embed(self, text: str | list[str], model_name: str | None = None) -> SparseEmbedding | list[SparseEmbedding]:
         if isinstance(text, list):
-            embeddings = [next(iter(self.embedder.embed(t))) for t in text]
-            return [
-                SparseEmbedding(
-                    name=self.embedding_name,
-                    values=embedding.values.tolist(),
-                    indices=embedding.indices.tolist(),
-                )
-                for embedding in embeddings
-            ]
-        else:
-            embedding = next(iter(self.embedder.embed(text)))
-            return SparseEmbedding(
-                name=self.embedding_name,
-                values=embedding.values.tolist(),
-                indices=embedding.indices.tolist(),
-            )
+            return results
+        return results[0]
+
+    async def a_embed(
+        self, text: str | list[str], model_name: str | None = None
+    ) -> SparseEmbedding | list[SparseEmbedding]:
+        return await asyncio.to_thread(self.embed, text, model_name)
