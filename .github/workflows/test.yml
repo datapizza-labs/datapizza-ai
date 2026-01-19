@@ -19,5 +19,8 @@ jobs:
       - name: Install uvtest-monorepo
         run: uv tool install uvtest-monorepo
 
+      - name: Run ruff check
+        run: uvx ruff check .
+
       - name: Run tests
         run: uvtest run --fail-fast
