@@ -16,14 +16,12 @@ elements:
 
 ingestion_pipeline:
   clients:
-    openai_client:
-      provider: openai
-      model: "gpt-4o-mini"
-      api_key: "1234567890"
-    openai_embedder:
-      provider: openai
-      model: "text-embedding-3-small"
-      api_key: "1234567890"
+    mock_client:
+      provider: mock
+      model: "mock-model"
+    mock_embedder:
+      provider: mock
+      model: "mock-embedder"
 
   modules:
     - name: parser
@@ -38,15 +36,8 @@ ingestion_pipeline:
       type: LLMCaptioner
       module: datapizza.modules.captioners
       params:
-        client: openai_client
+        client: mock_client
         system_prompt_table: "${PROMPT_TABLE}"
         system_prompt_figure: "${PROMPT_FIGURE}"
-
-  vector_store:
-    type: QdrantVectorstore
-    module: datapizza.vectorstores.qdrant
-    params:
-      host: "localhost"
-      port: 6333
 
   collection_name: "test_elements"

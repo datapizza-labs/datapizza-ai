@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from datapizza.clients.mock_client import MockClient
 from datapizza.core.clients.client import ClientResponse, StreamInferenceClientModule
 from datapizza.core.models import PipelineComponent
 from datapizza.embedders.embedders import ClientEmbedder
 from datapizza.modules.rewriters import ToolRewriter
 from datapizza.pipeline.dag_pipeline import DagPipeline
+
+# Get the directory containing this test file for relative path resolution
+TEST_DIR = Path(__file__).parent
 
 
 class A(PipelineComponent):
@@ -90,7 +95,7 @@ def test_graph_pipeline_run_with_multiple_keys():
 
 def test_graph_pipeline_from_yaml():
     pipeline = DagPipeline()
-    pipeline.from_yaml("datapizza-ai-core/datapizza/pipeline/tests/dag_config.yaml")
+    pipeline.from_yaml(str(TEST_DIR / "dag_config.yaml"))
 
     assert pipeline.nodes["rewriter"].__class__ == ToolRewriter
     assert pipeline.nodes["embedder"].__class__ == ClientEmbedder
@@ -102,7 +107,7 @@ def test_graph_pipeline_from_yaml():
 
 def test_graph_pipeline_from_yaml_with_constants():
     pipeline = DagPipeline()
-    pipeline.from_yaml("datapizza-ai-core/datapizza/pipeline/tests/dag_config.yaml")
+    pipeline.from_yaml(str(TEST_DIR / "dag_config.yaml"))
 
     assert (
         pipeline.nodes["rewriter"].system_prompt

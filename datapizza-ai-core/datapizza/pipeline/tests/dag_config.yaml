@@ -3,31 +3,25 @@ constants:
 
 dag_pipeline:
   clients:
-    openai_client:
-      provider: openai
-      model: "gpt-4o-mini"
-      api_key: "test"
-    openai_embedder:
-      provider: openai
-      model: "text-embedding-3-small"
-      api_key: "test"
-    azure_openai_generator:
-      provider: openai
-      model: "gpt-4.1"
-      api_key: "asd"
+    mock_client:
+      provider: mock
+      model: "mock-model"
+    mock_embedder:
+      provider: mock
+      model: "mock-embedder"
 
   modules:
     - name: rewriter
       type: ToolRewriter
       module: datapizza.modules.rewriters
       params:
-        client: openai_client
+        client: mock_client
         system_prompt: ${PROMPT}
     - name: embedder
       type: ClientEmbedder
       module: datapizza.embedders
       params:
-        client: openai_embedder
+        client: mock_embedder
 
   connections:
     - from: rewriter

@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from datapizza.core.models import PipelineComponent
 from datapizza.pipeline import Dependency, FunctionalPipeline
+
+# Get the directory containing this test file for relative path resolution
+TEST_DIR = Path(__file__).parent
 
 
 def test_functional_pipeline():
@@ -117,15 +122,17 @@ def test_pipeline_with_get():
 
 
 def test_pipeline_from_yaml():
+    from datapizza.clients.mock_client import MockClient
     from datapizza.modules.rewriters import ToolRewriter
 
     pipeline = FunctionalPipeline.from_yaml(
-        "datapizza-ai-core/datapizza/pipeline/tests/functional_pipeline_config.yaml"
+        str(TEST_DIR / "functional_pipeline_config.yaml")
     )
     assert pipeline is not None
     assert pipeline.nodes[0].get("name") == "rewriter"
     assert pipeline.nodes[0].get("node").__class__ == ToolRewriter
-    assert pipeline.nodes[0].get("node").client.model_name == "gpt-4o"
+    assert isinstance(pipeline.nodes[0].get("node").client, MockClient)
+    assert pipeline.nodes[0].get("node").client.model_name == "mock-model"
 
 
 def test_pipeline_with_foreach():

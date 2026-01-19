@@ -1,5 +1,6 @@
 from enum import Enum
 
+from datapizza.clients.mock_client import MockClient
 from datapizza.core.clients.client import Client
 
 
@@ -12,6 +13,8 @@ class Provider(str, Enum):
     MISTRAL = "mistral"
     AZURE_OPENAI = "azure_openai"
     WATSONX = "watsonx"
+    MOCK = "mock"
+
 
 class ClientFactory:
     """Factory for creating LLM clients"""
@@ -147,5 +150,7 @@ class ClientFactory:
                     temperature=temperature,
                     **kwargs,
                 )
+            case Provider.MOCK:
+                return MockClient(model_name=model, system_prompt=system_prompt)
             case _:
                 raise ValueError(f"Unsupported provider: {provider}")
