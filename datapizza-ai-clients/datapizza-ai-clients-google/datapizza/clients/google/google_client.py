@@ -592,7 +592,11 @@ class GoogleClient(Client):
                     )
                 )
         else:
-            if hasattr(response, "candidates") and response.candidates and response.candidates[0].content.parts:
+            if (
+                hasattr(response, "candidates")
+                and response.candidates
+                and response.candidates[0].content.parts
+            ):
                 for part in response.candidates[0].content.parts:
                     # Handle inline_data (images from generation or code execution)
                     if hasattr(part, "inline_data") and part.inline_data is not None:
@@ -602,8 +606,8 @@ class GoogleClient(Client):
                             source=base64.b64encode(part.inline_data.data).decode(
                                 "utf-8"
                             ),
-                            extension=(part.inline_data.mime_type.split("/")[-1]) 
-                            if part.inline_data.mime_type 
+                            extension=(part.inline_data.mime_type.split("/")[-1])
+                            if part.inline_data.mime_type
                             else "png",
                         )
                         blocks.append(MediaBlock(media=media))
