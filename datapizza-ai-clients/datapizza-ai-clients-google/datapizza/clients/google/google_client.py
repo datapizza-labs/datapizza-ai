@@ -98,13 +98,36 @@ class GoogleClient(Client):
         if isinstance(schema, dict):
             sanitized = {}
             for key, value in schema.items():
-                if key in ["additionalProperties", "additional_properties"]:
+                if key in [
+                    "additionalProperties",
+                    "additional_properties",
+                    "minLength",
+                    "maxLength",
+                    "pattern",
+                    "format",
+                    "minItems",
+                    "maxItems",
+                    "uniqueItems",
+                ]:
                     continue
                 if key == "exclusiveMinimum":
-                    sanitized["minimum"] = value + 1
+                    # For integers: exclusiveMinimum: 0 → minimum: 1 (next valid int)
+                    # For floats: just use the value (slight relaxation, allows boundary)
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["minimum"] = int(value) + 1
+                    else:
+                        sanitized["minimum"] = value
                     continue
                 if key == "exclusiveMaximum":
-                    sanitized["maximum"] = value - 1
+                    # Same logic for maximum
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["maximum"] = int(value) - 1
+                    else:
+                        sanitized["maximum"] = value
                     continue
 
                 sanitized[key] = self._sanitize_schema(value)
