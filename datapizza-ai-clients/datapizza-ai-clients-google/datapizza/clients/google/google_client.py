@@ -96,12 +96,56 @@ class GoogleClient(Client):
                 f"Failed to initialize Google GenAI client: {e!s}"
             ) from None
 
+    def _sanitize_schema(self, schema: Any) -> Any:
+        """Remove JSON Schema keys unsupported by Gemini's function schema."""
+        if isinstance(schema, dict):
+            sanitized = {}
+            for key, value in schema.items():
+                if key in [
+                    "additionalProperties",
+                    "additional_properties",
+                    "minLength",
+                    "maxLength",
+                    "pattern",
+                    "format",
+                    "minItems",
+                    "maxItems",
+                    "uniqueItems",
+                ]:
+                    continue
+                if key == "exclusiveMinimum":
+                    # For integers: exclusiveMinimum: 0 → minimum: 1 (next valid int)
+                    # For floats: just use the value (slight relaxation, allows boundary)
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["minimum"] = int(value) + 1
+                    else:
+                        sanitized["minimum"] = value
+                    continue
+                if key == "exclusiveMaximum":
+                    # Same logic for maximum
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["maximum"] = int(value) - 1
+                    else:
+                        sanitized["maximum"] = value
+                    continue
+
+                sanitized[key] = self._sanitize_schema(value)
+            return sanitized
+        if isinstance(schema, list):
+            return [self._sanitize_schema(item) for item in schema]
+        return schema
+
     def _convert_tool(self, tool: Tool) -> dict:
         """Convert tools to Google function format"""
+        parameters_schema = self._sanitize_schema(tool.schema["parameters"])
         parameters = {
-            "type": tool.schema["parameters"]["type"],
-            "properties": tool.schema["parameters"]["properties"],
-            "required": tool.schema["parameters"]["required"],
+            "type": parameters_schema.get("type"),
+            "properties": parameters_schema.get("properties", {}),
+            "required": parameters_schema.get("required", []),
         }
 
         return {
