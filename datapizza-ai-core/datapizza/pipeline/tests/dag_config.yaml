@@ -6,9 +6,11 @@ dag_pipeline:
     mock_client:
       provider: mock
       model: "mock-model"
+      api_key: "abc"
     mock_embedder:
       provider: mock
       model: "mock-embedder"
+      api_key: "abc"
 
   modules:
     - name: rewriter

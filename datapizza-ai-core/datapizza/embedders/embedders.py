@@ -50,7 +50,7 @@ class ChunkEmbedder(PipelineComponent):
         """
         self.client = client
         self.model_name = model_name
-        self.embedding_name = embedding_name or model_name or self.client.model_name
+        self.embedding_name = embedding_name
         self.batch_size = batch_size
 
     def _batch_nodes(
