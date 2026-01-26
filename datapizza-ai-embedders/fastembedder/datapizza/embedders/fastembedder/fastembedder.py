@@ -14,6 +14,7 @@ class FastEmbedder(BaseEmbedder):
         model_name: str,
         embedding_name: str | None = None,
         cache_dir: str | None = None,
+        **kwargs,
     ):
         self.model_name = model_name
         if embedding_name:
@@ -23,7 +24,7 @@ class FastEmbedder(BaseEmbedder):
 
         self.cache_dir = cache_dir
         self.embedder = fastembed.SparseTextEmbedding(
-            model_name=model_name, cache_dir=cache_dir
+            model_name=model_name, cache_dir=cache_dir, **kwargs
         )
 
     def embed(
