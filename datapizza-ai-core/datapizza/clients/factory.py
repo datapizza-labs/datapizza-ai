@@ -8,6 +8,7 @@ class Provider(str, Enum):
     """Supported LLM providers"""
 
     OPENAI = "openai"
+    OPENAI_LIKE = "openai_like"
     GOOGLE = "google"
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"
@@ -58,6 +59,22 @@ class ClientFactory:
                     ) from e
 
                 return OpenAIClient(
+                    api_key=api_key,
+                    model=model,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    **kwargs,
+                )
+
+            case Provider.OPENAI_LIKE:
+                try:
+                    from datapizza.clients.openai_like import OpenAILikeClient
+                except ImportError as e:
+                    raise ImportError(
+                        "OpenAIClient is not installed. Please install it with `pip install datapizza-ai-clients-openai-like"
+                    ) from e
+
+                return OpenAILikeClient(
                     api_key=api_key,
                     model=model,
                     system_prompt=system_prompt,
