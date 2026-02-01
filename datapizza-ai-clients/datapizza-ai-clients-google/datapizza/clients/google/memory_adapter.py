@@ -102,6 +102,11 @@ class GoogleMemoryAdapter(MemoryAdapter):
                         "data": pdf_bytes,
                     }
                 }
+            case "url":
+                return types.Part.from_uri(
+                    file_uri=block.media.source,
+                    mime_type="application/pdf",
+                )
 
             case _:
                 raise NotImplementedError(
