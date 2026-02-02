@@ -18,5 +18,31 @@
   "typeCheckingMode": "basic",
   "pythonVersion": "3.11",
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "extraPaths": [
+    "datapizza-ai-cache/redis",
+    "datapizza-ai-clients/datapizza-ai-clients-anthropic",
+    "datapizza-ai-clients/datapizza-ai-clients-bedrock",
+    "datapizza-ai-clients/datapizza-ai-clients-google",
+    "datapizza-ai-clients/datapizza-ai-clients-mistral",
+    "datapizza-ai-clients/datapizza-ai-clients-openai",
+    "datapizza-ai-clients/datapizza-ai-clients-openai-like",
+    "datapizza-ai-clients/datapizza-ai-clients-watsonx",
+    "datapizza-ai-core",
+    "datapizza-ai-embedders/cohere",
+    "datapizza-ai-embedders/fastembedder",
+    "datapizza-ai-embedders/google",
+    "datapizza-ai-embedders/mistral",
+    "datapizza-ai-embedders/openai",
+    "datapizza-ai-modules/parsers/azure",
+    "datapizza-ai-modules/parsers/docling",
+    "datapizza-ai-modules/rerankers/cohere",
+    "datapizza-ai-modules/rerankers/together",
+    "datapizza-ai-tools/SQLDatabase",
+    "datapizza-ai-tools/duckduckgo",
+    "datapizza-ai-tools/filesystem",
+    "datapizza-ai-tools/web_fetch",
+    "datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus",
+    "datapizza-ai-vectorstores/datapizza-ai-vectorstores-qdrant"
+  ]
 }
