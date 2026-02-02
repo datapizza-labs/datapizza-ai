@@ -1,10 +1,13 @@
+import logging
+
 from datapizza.core.clients import Client
 from datapizza.core.modules.rewriter import Rewriter
 from datapizza.memory.memory import Memory
 from datapizza.tools import Tool
 from datapizza.tools.tools import tool
-from datapizza.type.type import FunctionCallBlock
+from datapizza.type.type import FunctionCallBlock, TextBlock
 
+log = logging.getLogger(__name__)
 
 class ToolRewriter(Rewriter):
     """
@@ -60,13 +63,22 @@ class ToolRewriter(Rewriter):
             raise ValueError(
                 "ToolRewriter supposed to return only one response, something bad occured"
             )
-        else:
-            if not isinstance(response.content[0], FunctionCallBlock):
-                raise ValueError(
-                    "ToolRewriter supposed to return a FunctionCallBlock, something bad occured"
-                )
 
-            return response.content[0].arguments[self.tool_output_name]
+        content = response.content[0]
+
+        if isinstance(content, FunctionCallBlock):
+            return content.arguments[self.tool_output_name]
+        elif isinstance(content, TextBlock):
+            log.warning(
+                "LLM returned TextBlock instead of FunctionCallBlock. "
+                "The model may not support tool_choice='required' or the query was too generic. "
+                "Returning original user prompt as fallback."
+            )
+            return user_prompt
+        else:
+            raise ValueError(
+                f"ToolRewriter expected FunctionCallBlock or TextBlock, got {type(content).__name__}"
+            )
 
     async def a_rewrite(self, user_prompt: str, memory: Memory | None = None) -> str:
         """
@@ -86,16 +98,27 @@ class ToolRewriter(Rewriter):
             tools=[self.tool],
             **self.invoke_args,
         )
+
         if len(response.content) != 1:
             raise ValueError(
                 "ToolRewriter supposed to return only one response, something bad occured"
             )
+
+        content = response.content[0]
+
+        if isinstance(content, FunctionCallBlock):
+            return content.arguments[self.tool_output_name]
+        elif isinstance(content, TextBlock):
+            log.warning(
+                "LLM returned TextBlock instead of FunctionCallBlock. "
+                "The model may not support tool_choice='required' or the query was too generic. "
+                "Returning original user prompt as fallback."
+            )
+            return user_prompt
         else:
-            if not isinstance(response.content[0], FunctionCallBlock):
-                raise ValueError(
-                    "ToolRewriter supposed to return a FunctionCallBlock, something bad occured"
-                )
-            return response.content[0].arguments[self.tool_output_name]
+            raise ValueError(
+                f"ToolRewriter expected FunctionCallBlock or TextBlock, got {type(content).__name__}"
+            )
 
     @tool
     def _search_vectorstore(self, query: str):
