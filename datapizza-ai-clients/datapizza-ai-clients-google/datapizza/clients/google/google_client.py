@@ -662,10 +662,24 @@ class GoogleClient(Client):
 
         usage_metadata = getattr(response, "usage_metadata", None)
         token_usage = self._token_usage_from_metadata(usage_metadata)
-        return ClientResponse(
+        client_response = ClientResponse(
             content=blocks,
             stop_reason=(response.candidates[0].finish_reason.value.lower())
             if hasattr(response, "candidates") and response.candidates
             else None,
             usage=token_usage,
         )
+
+        # Add grounding_metadata and url_context_metadata if present
+        if hasattr(response, "candidates") and response.candidates:
+            candidate = response.candidates[0]
+
+            grounding = getattr(candidate, "grounding_metadata", None)
+            if grounding:
+                client_response.grounding_metadata = grounding  # type: ignore[attr-defined]
+
+            url_context = getattr(candidate, "url_context_metadata", None)
+            if url_context:
+                client_response.url_context_metadata = url_context  # type: ignore[attr-defined]
+
+        return client_response
