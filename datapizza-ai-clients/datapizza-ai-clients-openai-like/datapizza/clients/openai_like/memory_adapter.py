@@ -15,16 +15,19 @@ from datapizza.type import (
 
 class OpenAILikeMemoryAdapter(MemoryAdapter):
     def _turn_to_message(self, turn: Turn) -> dict:
-        content = []
+        content_blocks: list[dict] = []
         tool_calls = []
         tool_call_id = None
+        text_parts: list[str] = []
 
         for block in turn:
             block_dict = {}
 
             match block:
                 case TextBlock():
-                    block_dict = {"type": "text", "text": block.content}
+                    text_parts.append(block.content)
+                case StructuredBlock():
+                    text_parts.append(str(block.content))
                 case FunctionCallBlock():
                     tool_calls.append(
                         {
@@ -38,10 +41,7 @@ class OpenAILikeMemoryAdapter(MemoryAdapter):
                     )
                 case FunctionCallResultBlock():
                     tool_call_id = block.id
-                    block_dict = {"type": "text", "text": block.result}
-
-                case StructuredBlock():
-                    block_dict = {"type": "text", "text": str(block.content)}
+                    text_parts.append(block.result)
                 case MediaBlock():
                     match block.media.media_type:
                         case "image":
@@ -50,27 +50,31 @@ class OpenAILikeMemoryAdapter(MemoryAdapter):
                             block_dict = self._process_pdf_block(block)
                         case "audio":
                             block_dict = self._process_audio_block(block)
-
                         case _:
                             raise NotImplementedError(
                                 f"Unsupported media type: {block.media.media_type}"
                             )
 
             if block_dict:
-                content.append(block_dict)
+                content_blocks.append(block_dict)
 
-        messages = {
-            "role": turn.role.value,
-            "content": (content),
-        }
+        text_content = "".join(text_parts) if text_parts else None
+
+        if content_blocks:
+            if text_content:
+                content_blocks.insert(0, {"type": "text", "text": text_content})
+            content_value = content_blocks
+        else:
+            content_value = text_content if text_content is not None else ""
+
+        message = {"role": turn.role.value, "content": content_value}
 
         if tool_calls:
-            messages["tool_calls"] = tool_calls
-
+            message["tool_calls"] = tool_calls
         if tool_call_id:
-            messages["tool_call_id"] = tool_call_id
+            message["tool_call_id"] = tool_call_id
 
-        return messages
+        return message
 
     def _process_audio_block(self, block: MediaBlock) -> dict:
         match block.media.source_type:
