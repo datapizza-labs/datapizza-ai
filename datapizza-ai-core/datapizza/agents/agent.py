@@ -564,7 +564,9 @@ class Agent:
         self, function_call: FunctionCallBlock
     ) -> FunctionCallResultBlock:
         with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute("tool_arguments", function_call.arguments)
+            current_tool_span.set_attribute(
+                "tool_arguments", str(function_call.arguments)
+            )
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
@@ -587,7 +589,9 @@ class Agent:
         self, function_call: FunctionCallBlock
     ) -> FunctionCallResultBlock:
         with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute("tool_arguments", function_call.arguments)
+            current_tool_span.set_attribute(
+                "tool_arguments", str(function_call.arguments)
+            )
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
