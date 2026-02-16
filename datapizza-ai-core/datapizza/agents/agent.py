@@ -563,13 +563,15 @@ class Agent:
     def _execute_tool(
         self, function_call: FunctionCallBlock
     ) -> FunctionCallResultBlock:
-        with tool_span(f"Tool {function_call.tool.name}"):
+        with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
+            current_tool_span.set_attribute("tool_arguments", function_call.arguments)
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
                 result = AsyncExecutor.get_instance().run(result)
 
             if result:
+                current_tool_span.set_attribute("tool_result", result)
                 self._logger.log_panel(
                     result,
                     title=f"TOOL {function_call.tool.name.upper()} RESULT",
@@ -584,13 +586,15 @@ class Agent:
     async def _a_execute_tool(
         self, function_call: FunctionCallBlock
     ) -> FunctionCallResultBlock:
-        with tool_span(f"Tool {function_call.tool.name}"):
+        with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
+            current_tool_span.set_attribute("tool_arguments", function_call.arguments)
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
                 result = await result
 
             if result:
+                current_tool_span.set_attribute("tool_result", result)
                 self._logger.log_panel(
                     result,
                     title=f"TOOL {function_call.tool.name.upper()} RESULT",
