@@ -617,48 +617,56 @@ class GoogleClient(Client):
         self, response, tool_map: dict[str, Tool] | None = None
     ) -> ClientResponse:
         blocks = []
-        # Handle function calls if present
-        if hasattr(response, "function_calls") and response.function_calls:
-            for fc in response.function_calls:
-                if not tool_map:
-                    raise ValueError("Tool map is required")
+        
+        # Check if response has candidates with parts
+        if (
+            hasattr(response, "candidates")
+            and response.candidates
+            and response.candidates[0].content
+            and response.candidates[0].content.parts
+        ):
+            for part in response.candidates[0].content.parts:
+                # Handle function calls - extract thought_signature from part
+                if hasattr(part, "function_call") and part.function_call:
+                    fc = part.function_call
+                    if not tool_map:
+                        raise ValueError("Tool map is required")
 
-                tool = tool_map.get(fc.name, None)
-                if not tool:
-                    raise ValueError(f"Tool {fc.name} not found in tool map")
+                    tool = tool_map.get(fc.name, None)
+                    if not tool:
+                        raise ValueError(f"Tool {fc.name} not found in tool map")
 
-                blocks.append(
-                    FunctionCallBlock(
-                        name=fc.name,
-                        arguments=fc.args,
-                        id=f"fc_{id(fc)}",
-                        tool=tool,
-                    )
-                )
-        else:
-            if (
-                hasattr(response, "candidates")
-                and response.candidates
-                and response.candidates[0].content.parts
-            ):
-                for part in response.candidates[0].content.parts:
-                    # Handle inline_data (images from generation or code execution)
-                    if hasattr(part, "inline_data") and part.inline_data is not None:
-                        media = Media(
-                            media_type="image",
-                            source_type="base64",
-                            source=base64.b64encode(part.inline_data.data).decode(
-                                "utf-8"
-                            ),
-                            extension=(part.inline_data.mime_type.split("/")[-1])
-                            if part.inline_data.mime_type
-                            else "png",
+                    # Extract thought_signature if present (required for Gemini 2.0+)
+                    thought_sig = None
+                    if hasattr(part, "thought_signature"):
+                        thought_sig = part.thought_signature
+
+                    blocks.append(
+                        FunctionCallBlock(
+                            name=fc.name,
+                            arguments=dict(fc.args) if fc.args else {},
+                            id=f"fc_{id(fc)}",
+                            tool=tool,
+                            thought_signature=thought_sig,
                         )
-                        blocks.append(MediaBlock(media=media))
-                    elif hasattr(part, "thought") and part.thought and part.text:
-                        blocks.append(ThoughtBlock(content=part.text))
-                    elif hasattr(part, "text") and part.text:
-                        blocks.append(TextBlock(content=part.text))
+                    )
+                # Handle inline_data (images from generation or code execution)
+                elif hasattr(part, "inline_data") and part.inline_data is not None:
+                    media = Media(
+                        media_type="image",
+                        source_type="base64",
+                        source=base64.b64encode(part.inline_data.data).decode(
+                            "utf-8"
+                        ),
+                        extension=(part.inline_data.mime_type.split("/")[-1])
+                        if part.inline_data.mime_type
+                        else "png",
+                    )
+                    blocks.append(MediaBlock(media=media))
+                elif hasattr(part, "thought") and part.thought and part.text:
+                    blocks.append(ThoughtBlock(content=part.text))
+                elif hasattr(part, "text") and part.text:
+                    blocks.append(TextBlock(content=part.text))
 
         usage_metadata = getattr(response, "usage_metadata", None)
         token_usage = self._token_usage_from_metadata(usage_metadata)
