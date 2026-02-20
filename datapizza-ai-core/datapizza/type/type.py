@@ -68,6 +68,7 @@ class Block:
                     arguments=data.get("arguments", {}),
                     name=data.get("name", ""),
                     tool=tool,
+                    thought_signature=data.get("thought_signature"),
                 )
             case "function_call_result":
                 tool = Tool.tool_from_dict(data.get("tool"))
@@ -170,6 +171,7 @@ class FunctionCallBlock(Block):
         name: str,
         tool: Tool,
         type: str = "function",
+        thought_signature: str | None = None,
     ):
         """
         Initialize a FunctionCallBlock object.
@@ -179,11 +181,14 @@ class FunctionCallBlock(Block):
             arguments (dict[str, Any]): The arguments of the function call block.
             name (str): The name of the function call block.
             tool (Tool): The tool of the function call block.
+            thought_signature (str, optional): The thought signature for Gemini 2.0+ models.
+                Required for multi-turn function calling with thinking models.
         """
         self.id = id
         self.arguments = arguments
         self.name = name
         self.tool = tool
+        self.thought_signature = thought_signature
         super().__init__(type)
 
     def __eq__(self, other):
@@ -204,13 +209,16 @@ class FunctionCallBlock(Block):
         return int(hashlib.sha256(self.id.encode("utf-8")).hexdigest(), 16)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "type": self.type,
             "id": self.id,
             "arguments": self.arguments,
             "name": self.name,
             "tool": self.tool.to_dict(),
         }
+        if self.thought_signature:
+            result["thought_signature"] = self.thought_signature
+        return result
 
 
 class FunctionCallResultBlock(Block):
