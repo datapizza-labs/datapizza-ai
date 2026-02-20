@@ -35,6 +35,7 @@ dependencies = [
 dev = [
     "deptry>=0.23.0",
     "pytest",
+    "pytest-asyncio",
     "ruff>=0.11.5",
 ]
 
