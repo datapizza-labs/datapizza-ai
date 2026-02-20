@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
@@ -19,6 +19,29 @@ from datapizza.tools import Tool
 class MCPClient:
     """
     Helper for interacting with Model Context Protocol servers.
+
+    Can be used in two modes:
+
+    1. **Stateless mode** (default): Each operation creates a new session.
+       Good for HTTP-based MCP servers that don't require persistence.
+
+       ```python
+       client = MCPClient(url="https://example.com/mcp")
+       tools = client.list_tools()
+       # Each tool call creates a new session
+       ```
+
+    2. **Persistent mode**: Use as an async context manager to keep the session
+       alive across multiple operations. Required for stdio-based servers or
+       servers that maintain state.
+
+       ```python
+       async with MCPClient(command="uvx", args=["my-mcp-server"]) as client:
+           tools = await client.a_list_tools()
+           # All tool calls share the same session
+           agent = Agent(tools=tools)
+           await agent.a_run("do something")
+       ```
 
     Args:
         url: The URL of the MCP server.
@@ -49,19 +72,83 @@ class MCPClient:
         self.headers = headers or {}
         self.sampling_callback = sampling_callback
 
+        # Persistent session state
+        self._persistent_session: ClientSession | None = None
+        self._exit_stack: AsyncExitStack | None = None
+
         if not url and not command:
             raise ValueError("Either url or command must be provided")
         if url and command:
             raise ValueError("Only one of url or command must be provided")
 
+    async def __aenter__(self) -> MCPClient:
+        """Enter persistent session mode."""
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+
+        if self.url:
+            read_stream, write_stream, _ = await self._exit_stack.enter_async_context(
+                streamablehttp_client(
+                    self.url,
+                    headers=self.headers or None,
+                    timeout=self._get_timeout,
+                )
+            )
+        elif self.command:
+            server_parameters = StdioServerParameters(
+                command=self.command,
+                args=self.args,
+                env=self.env or None,
+            )
+            read_stream, write_stream = await self._exit_stack.enter_async_context(
+                stdio_client(server_parameters)
+            )
+        else:
+            raise ValueError("Either url or command must be provided")
+
+        session = await self._exit_stack.enter_async_context(
+            ClientSession(
+                read_stream,
+                write_stream,
+                read_timeout_seconds=self._get_timeout,
+                sampling_callback=self.sampling_callback,
+            )
+        )
+        await session.initialize()
+        self._persistent_session = session
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit persistent session mode and cleanup resources."""
+        self._persistent_session = None
+        if self._exit_stack:
+            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+            self._exit_stack = None
+
     @property
     def _get_timeout(self) -> timedelta:
         return timedelta(seconds=self.timeout)
 
+    @property
+    def is_persistent(self) -> bool:
+        """Return True if the client is in persistent session mode."""
+        return self._persistent_session is not None
+
     @asynccontextmanager
     async def _session(self) -> AsyncIterator[ClientSession]:
-        """Yield an initialized :class:`ClientSession` for a single operation."""
+        """
+        Yield an initialized ClientSession.
 
+        If the client is in persistent mode (used as async context manager),
+        yields the persistent session. Otherwise, creates a new session
+        for this single operation.
+        """
+        # Use persistent session if available
+        if self._persistent_session is not None:
+            yield self._persistent_session
+            return
+
+        # Otherwise create a new session for this operation
         if self.url:
             async with (
                 streamablehttp_client(
