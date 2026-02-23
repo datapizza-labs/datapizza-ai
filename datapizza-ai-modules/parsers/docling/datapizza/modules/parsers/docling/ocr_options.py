@@ -98,4 +98,3 @@ class OCROptions:
 
         # Fallback (should not reach here if Enum is exhaustive)
         return pipeline_kwargs
-

@@ -53,9 +53,7 @@ def test_parse_with_both_file_and_pdf_path(mock_docling_parser, tmp_path):
 
 def test_parse_missing_file_path_raises():
     parser = DoclingParser()
-    with pytest.raises(
-        ValueError, match="Missing required argument: file_path"
-    ):
+    with pytest.raises(ValueError, match="Missing required argument: file_path"):
         parser.parse()
 
 
@@ -63,9 +61,7 @@ def test_parser_ocr_options_backward_compatibility(mock_docling_parser):
     """Test parser works without explicit OCR options (backward compat)."""
     # Parser created without ocr_options should use default (EasyOCR)
     assert mock_docling_parser.ocr_options.engine == OCREngine.EASY_OCR
-    assert (
-        mock_docling_parser.ocr_options.easy_ocr_force_full_page is True
-    )
+    assert mock_docling_parser.ocr_options.easy_ocr_force_full_page is True
 
 
 def test_parser_with_custom_ocr_options(mock_docling_parser, monkeypatch):
@@ -134,9 +130,7 @@ def test_parse_with_metadata(mock_docling_parser, tmp_path):
         "custom_field": "test_value",
     }
 
-    node = mock_docling_parser.parse(
-        file_path=str(dummy_file), metadata=user_metadata
-    )
+    node = mock_docling_parser.parse(file_path=str(dummy_file), metadata=user_metadata)
 
     assert node.metadata["source"] == "user_upload"
     assert node.metadata["custom_field"] == "test_value"
@@ -150,9 +144,7 @@ def test_parse_with_none_metadata(mock_docling_parser, tmp_path):
     dummy_file = tmp_path / "test.pdf"
     dummy_file.write_text("fake-pdf-content")
 
-    node = mock_docling_parser.parse(
-        file_path=str(dummy_file), metadata=None
-    )
+    node = mock_docling_parser.parse(file_path=str(dummy_file), metadata=None)
 
     assert isinstance(node, Node)
     assert node.node_type == NodeType.DOCUMENT
@@ -165,9 +157,7 @@ def test_parse_metadata_type_validation(mock_docling_parser, tmp_path):
     dummy_file.write_text("fake-pdf-content")
 
     with pytest.raises(TypeError, match="metadata must be a dict or None"):
-        mock_docling_parser.parse(
-            file_path=str(dummy_file), metadata="invalid_string"
-        )
+        mock_docling_parser.parse(file_path=str(dummy_file), metadata="invalid_string")
 
     with pytest.raises(TypeError, match="metadata must be a dict or None"):
         mock_docling_parser.parse(file_path=str(dummy_file), metadata=123)
@@ -190,18 +180,14 @@ def test_parse_metadata_override(mock_docling_parser, tmp_path):
 
     # Now override with user metadata
     user_metadata = {"name": "custom_name"}
-    node2 = mock_docling_parser.parse(
-        file_path=str(dummy_file), metadata=user_metadata
-    )
+    node2 = mock_docling_parser.parse(file_path=str(dummy_file), metadata=user_metadata)
 
     # User metadata should override
     assert node2.metadata["name"] == "custom_name"
     assert node2.metadata["name"] != original_name
 
 
-def test_parse_with_metadata_and_deprecated_pdf_path(
-    mock_docling_parser, tmp_path
-):
+def test_parse_with_metadata_and_deprecated_pdf_path(mock_docling_parser, tmp_path):
     """Test metadata works with deprecated pdf_path parameter."""
     dummy_file = tmp_path / "legacy.pdf"
     dummy_file.write_text("fake-pdf")

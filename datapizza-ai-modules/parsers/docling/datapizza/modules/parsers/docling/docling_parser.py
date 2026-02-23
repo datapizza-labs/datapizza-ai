@@ -32,6 +32,7 @@ class DoclingParser(Parser):
     - Reading order follows body.children ($ref list)
     - Images and tables are mapped to FIGURE and TABLE nodes respectively, with bbox-only metadata
     """
+
     def __init__(
         self,
         json_output_dir: str | None = None,
@@ -781,7 +782,9 @@ class DoclingParser(Parser):
         """
         # Validate metadata type
         if metadata is not None and not isinstance(metadata, dict):
-            raise TypeError(f"metadata must be a dict or None, got {type(metadata).__name__}")
+            raise TypeError(
+                f"metadata must be a dict or None, got {type(metadata).__name__}"
+            )
 
         if pdf_path is not None:
             warnings.warn(

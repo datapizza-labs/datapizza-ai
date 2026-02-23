@@ -224,4 +224,3 @@ class TestMCPClientResources:
 
         mock_session.list_resource_templates.assert_called_once()
         assert result is mock_result
-

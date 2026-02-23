@@ -28,7 +28,8 @@ class MistralEmbedder(BaseEmbedder):
         if not self.a_client:
             self.a_client = mistralai.Mistral(api_key=self.api_key)
 
-    def embed(self, text: str | list[str], model_name: str | None = None
+    def embed(
+        self, text: str | list[str], model_name: str | None = None
     ) -> list[float] | list[list[float]]:
         """Embed text into dense embeddings using Mistral API.
 
@@ -50,12 +51,13 @@ class MistralEmbedder(BaseEmbedder):
 
         client = self._get_client()
         embedding_response = client.embeddings.create(
-            inputs=texts,
-            model=model,
-            server_url=self.base_url
+            inputs=texts, model=model, server_url=self.base_url
         )
 
-        embeddings = [embedding_response_data.embedding for embedding_response_data in embedding_response.data]
+        embeddings = [
+            embedding_response_data.embedding
+            for embedding_response_data in embedding_response.data
+        ]
         return embeddings[0] if isinstance(text, str) else embeddings
 
     async def a_embed(
@@ -81,12 +83,11 @@ class MistralEmbedder(BaseEmbedder):
 
         client = self._get_a_client()
         embedding_response = await client.embeddings.create_async(
-            inputs=texts,
-            model=model,
-            server_url=self.base_url
+            inputs=texts, model=model, server_url=self.base_url
         )
 
-        embeddings = [embedding_response_data.embedding for embedding_response_data in embedding_response.data]
+        embeddings = [
+            embedding_response_data.embedding
+            for embedding_response_data in embedding_response.data
+        ]
         return embeddings[0] if isinstance(text, str) else embeddings
-
-
