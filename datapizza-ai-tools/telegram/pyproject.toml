@@ -1,0 +1,59 @@
+# Build system configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Project metadata
+[project]
+name = "datapizza-ai-tools-telegram"
+version = "0.0.1"
+description = "Telegram Bot management tools for the datapizza-ai framework"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Datapizza", email = "datapizza@datapizza.tech"},
+    {name = "Gennaro Daniele Acciaro", email = "acciarogennaro@gmail.com"}
+]
+requires-python = ">=3.10.0,<4"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "datapizza-ai-core>=0.0.1",
+    "requests>=2.31.0",
+]
+
+# Development dependencies
+[dependency-groups]
+dev = [
+    "deptry>=0.23.0",
+    "pytest",
+    "ruff>=0.11.5",
+]
+
+# Hatch build configuration
+[tool.hatch.build.targets.sdist]
+include = ["/datapizza"]
+exclude = ["**/BUILD"]
+
+[tool.hatch.build.targets.wheel]
+include = ["/datapizza"]
+exclude = ["**/BUILD"]
+
+# Ruff configuration
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "W",
+    "F",
+    "B",
+    "I",
+    "UP",
+    "SIM",
+    "RUF",
+    "C4",
+]
