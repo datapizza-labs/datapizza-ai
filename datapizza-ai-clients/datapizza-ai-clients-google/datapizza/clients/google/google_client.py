@@ -617,7 +617,7 @@ class GoogleClient(Client):
         self, response, tool_map: dict[str, Tool] | None = None
     ) -> ClientResponse:
         blocks = []
-        
+
         # Check if response has candidates with parts
         if (
             hasattr(response, "candidates")
