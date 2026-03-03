@@ -187,8 +187,13 @@ class GoogleClient(Client):
 
         return TokenUsage(
             prompt_tokens=getattr(usage_metadata, "prompt_token_count", 0) or 0,
-            completion_tokens=getattr(usage_metadata, "candidates_token_count", 0) or 0,
+            completion_tokens=(
+                getattr(usage_metadata, "candidates_token_count", None)
+                or getattr(usage_metadata, "response_token_count", 0)
+                or 0
+            ),
             cached_tokens=getattr(usage_metadata, "cached_content_token_count", 0) or 0,
+            thinking_tokens=getattr(usage_metadata, "thoughts_token_count", 0) or 0,
         )
 
     def _convert_tool_choice(
@@ -655,9 +660,7 @@ class GoogleClient(Client):
                     media = Media(
                         media_type="image",
                         source_type="base64",
-                        source=base64.b64encode(part.inline_data.data).decode(
-                            "utf-8"
-                        ),
+                        source=base64.b64encode(part.inline_data.data).decode("utf-8"),
                         extension=(part.inline_data.mime_type.split("/")[-1])
                         if part.inline_data.mime_type
                         else "png",
