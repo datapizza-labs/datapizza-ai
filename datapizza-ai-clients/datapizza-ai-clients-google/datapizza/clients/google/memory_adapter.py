@@ -28,7 +28,7 @@ class GoogleMemoryAdapter(MemoryAdapter):
                         "function_call": {"name": block.name, "args": block.arguments}
                     }
                     # Include thought_signature if present (required for Gemini 2.0+)
-                    if block.thought_signature:
+                    if block.thought_signature is not None:
                         block_dict["thought_signature"] = block.thought_signature
                 case FunctionCallResultBlock():
                     block_dict = types.Part.from_function_response(

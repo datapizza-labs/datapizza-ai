@@ -56,6 +56,27 @@ def test_block_new_function_call():
     assert isinstance(block.tool, Tool)
 
 
+def test_block_new_function_call_with_bytes_thought_signature():
+    @tool
+    def test_func():
+        pass
+
+    block = FunctionCallBlock(
+        id="1",
+        arguments={},
+        name="test",
+        tool=test_func,
+        thought_signature=b"\x01\x02\x03",
+    )
+
+    json_data = block.to_dict()
+    restored = Block.from_dict(json_data)
+
+    assert json_data["thought_signature"] == {"encoding": "base64", "data": "AQID"}
+    assert isinstance(restored, FunctionCallBlock)
+    assert restored.thought_signature == b"\x01\x02\x03"
+
+
 def test_block_new_function_call_result():
     @tool
     def test_func():
