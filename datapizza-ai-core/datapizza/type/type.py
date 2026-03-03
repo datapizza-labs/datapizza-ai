@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import logging
 import uuid
@@ -63,11 +64,23 @@ class Block:
                 return ThoughtBlock(content=data.get("content", ""))
             case "function":
                 tool = Tool.tool_from_dict(data.get("tool"))
+
+                thought_signature = data.get("thought_signature")
+                if (
+                    isinstance(thought_signature, dict)
+                    and thought_signature.get("encoding") == "base64"
+                    and "data" in thought_signature
+                ):
+                    thought_signature = base64.b64decode(thought_signature["data"])
+                elif not isinstance(thought_signature, bytes):
+                    thought_signature = None
+
                 return FunctionCallBlock(
                     id=data.get("id", ""),
                     arguments=data.get("arguments", {}),
                     name=data.get("name", ""),
                     tool=tool,
+                    thought_signature=thought_signature,
                 )
             case "function_call_result":
                 tool = Tool.tool_from_dict(data.get("tool"))
@@ -170,6 +183,7 @@ class FunctionCallBlock(Block):
         name: str,
         tool: Tool,
         type: str = "function",
+        thought_signature: bytes | None = None,
     ):
         """
         Initialize a FunctionCallBlock object.
@@ -179,11 +193,14 @@ class FunctionCallBlock(Block):
             arguments (dict[str, Any]): The arguments of the function call block.
             name (str): The name of the function call block.
             tool (Tool): The tool of the function call block.
+            thought_signature (bytes, optional): The thought signature for Gemini 2.0+ models.
+                Required for multi-turn function calling with thinking models.
         """
         self.id = id
         self.arguments = arguments
         self.name = name
         self.tool = tool
+        self.thought_signature = thought_signature
         super().__init__(type)
 
     def __eq__(self, other):
@@ -204,13 +221,19 @@ class FunctionCallBlock(Block):
         return int(hashlib.sha256(self.id.encode("utf-8")).hexdigest(), 16)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "type": self.type,
             "id": self.id,
             "arguments": self.arguments,
             "name": self.name,
             "tool": self.tool.to_dict(),
         }
+        if isinstance(self.thought_signature, bytes):
+            result["thought_signature"] = {
+                "encoding": "base64",
+                "data": base64.b64encode(self.thought_signature).decode("ascii"),
+            }
+        return result
 
 
 class FunctionCallResultBlock(Block):
