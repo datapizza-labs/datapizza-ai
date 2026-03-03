@@ -9,6 +9,7 @@ from datapizza.type.type import FunctionCallBlock, TextBlock
 
 log = logging.getLogger(__name__)
 
+
 class ToolRewriter(Rewriter):
     """
     A tool-based query rewriter that uses LLMs to transform user queries through structured tool interactions.

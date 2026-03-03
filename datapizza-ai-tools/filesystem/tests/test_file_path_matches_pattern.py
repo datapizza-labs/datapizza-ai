@@ -50,6 +50,6 @@ def test_matches_regex(file_path, patterns, expected):
 
 
 def test_empty_patterns_list():
-    assert (
-        string_matches_patterns("/any/path", []) == True
-    ), "Should return True with empty patterns list"
+    assert string_matches_patterns("/any/path", []) == True, (
+        "Should return True with empty patterns list"
+    )
