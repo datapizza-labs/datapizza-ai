@@ -121,7 +121,7 @@ class DagPipeline:
 
             # Place it in the right location in args
             if edge.dst_key:
-                args[edge.dst_key] = value  # TODO  deepcopy(value)
+                args[edge.dst_key] = deepcopy(value)
             else:
                 raise ValueError(
                     f"No destination key provided for node '{node_name}' from '{edge.from_node_name}'."
