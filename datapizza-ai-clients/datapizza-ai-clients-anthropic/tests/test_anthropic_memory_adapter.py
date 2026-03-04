@@ -1,5 +1,8 @@
+import json
+
 from datapizza.memory.memory import Memory
-from datapizza.type import ROLE, TextBlock
+from datapizza.tools.tools import tool
+from datapizza.type import ROLE, FunctionCallResultBlock, TextBlock
 
 from datapizza.clients.anthropic import AnthropicClient
 from datapizza.clients.anthropic.memory_adapter import AnthropicMemoryAdapter
@@ -28,3 +31,26 @@ def test_anthropic_memory_adapter():
             "content": "Hello, world!",
         },
     ]
+
+
+def test_anthropic_memory_adapter_tool_result_turn_maps_to_user_role():
+    @tool
+    def get_city() -> str:
+        return "Rome"
+
+    memory_adapter = AnthropicMemoryAdapter()
+    memory = Memory()
+    memory.add_turn(
+        blocks=[FunctionCallResultBlock(id="toolu_1", tool=get_city, result="Rome")],
+        role=ROLE.TOOL,
+    )
+
+    messages = memory_adapter.memory_to_messages(memory)
+
+    assert messages[0]["role"] == "user"
+    content = json.loads(messages[0]["content"])
+    assert content == {
+        "type": "tool_result",
+        "tool_use_id": "toolu_1",
+        "content": "Rome",
+    }

@@ -302,6 +302,7 @@ class Agent:
 
             # Execute planning step
             step_output = None
+            step_has_tools = False
             for result in self._execute_planning_step(
                 current_steps, original_task, memory, **kwargs
             ):
@@ -309,9 +310,10 @@ class Agent:
                     yield result
                 elif isinstance(result, StepResult):
                     step_output = result.text
+                    step_has_tools = bool(result.tools_used)
                     yield result
 
-            if step_output and self._terminate_on_text:
+            if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output
                 break
 
@@ -380,6 +382,7 @@ class Agent:
 
             # Execute planning step
             step_output = None
+            step_has_tools = False
             async for result in self._a_execute_planning_step(
                 current_steps, original_task, memory, **kwargs
             ):
@@ -387,9 +390,10 @@ class Agent:
                     yield result
                 elif isinstance(result, StepResult):
                     step_output = result.text
+                    step_has_tools = bool(result.tools_used)
                     yield result
 
-            if step_output and self._terminate_on_text:
+            if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output
                 break
 

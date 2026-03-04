@@ -85,6 +85,22 @@ class MockClient(Client):
                 ]
             )
 
+        if "mixed function" in input_text and tools:
+            arguments = {
+                "text": "This is a test",
+            }
+            return ClientResponse(
+                content=[
+                    TextBlock(content="I will call a tool now."),
+                    FunctionCallBlock(
+                        id="1",
+                        arguments=arguments,
+                        name=tools[0].name,
+                        tool=tools[0],
+                    ),
+                ]
+            )
+
         if "function" in input_text and tools:
             arguments = {
                 "text": "This is a test",

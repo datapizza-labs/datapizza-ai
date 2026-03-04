@@ -242,3 +242,37 @@ class TestStatelessAgents:
 
         res = agent.run("function call")
         assert res.index == 2
+
+    def test_terminate_on_text_ignores_text_when_tool_call_is_present(self):
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            terminate_on_text=True,
+        )
+
+        res = agent.run("mixed function call")
+        assert res.index == 2
+        assert res.text == "tool called"
+
+    def test_a_terminate_on_text_ignores_text_when_tool_call_is_present(self):
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            terminate_on_text=True,
+        )
+
+        res = asyncio.run(agent.a_run("mixed function call"))
+        assert res.index == 2
+        assert res.text == "tool called"

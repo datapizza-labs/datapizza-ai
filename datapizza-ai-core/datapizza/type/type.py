@@ -42,7 +42,7 @@ class ROLE(Enum):
         elif self == ROLE.SYSTEM:
             return "model"
         elif self == ROLE.TOOL:
-            return "assistant"
+            return "user"
         else:
             raise ValueError(f"Unknown role: {self}")
 
