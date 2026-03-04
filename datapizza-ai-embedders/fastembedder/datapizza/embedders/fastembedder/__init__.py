@@ -1,3 +1,3 @@
-from .fastembedder import FastEmbedder
+from .fastembedder import FastDenseEmbedder, FastEmbedder
 
-__all__ = ["FastEmbedder"]
+__all__ = ["FastDenseEmbedder", "FastEmbedder"]
