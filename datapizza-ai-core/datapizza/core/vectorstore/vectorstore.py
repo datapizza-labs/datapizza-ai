@@ -16,7 +16,7 @@ class Distance(Enum):
 
 
 class VectorConfig(BaseModel):
-    name: str
+    name: str | None = None
     format: EmbeddingFormat = EmbeddingFormat.DENSE
     dimensions: int | None = None
     distance: Distance = Distance.COSINE
