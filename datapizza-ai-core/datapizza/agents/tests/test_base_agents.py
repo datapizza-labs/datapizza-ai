@@ -66,6 +66,26 @@ class TestBaseAgents:
         assert agent_aggregator._tools[0].name == agent1.as_tool().name
         assert agent_aggregator._tools[1].name == agent2.as_tool().name
 
+    def test_as_tool_end_invoke_true(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool(end=True)
+        assert a_tool.end_invoke is True
+
+    def test_as_tool_end_invoke_default_false(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.end_invoke is False
+
     def test_params_as_class_attributes(self):
         class TestAgent(Agent):
             name = "test"

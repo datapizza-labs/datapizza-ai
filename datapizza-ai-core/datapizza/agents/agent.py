@@ -157,7 +157,7 @@ class Agent:
             self._tools.append(a.as_tool())
 
     @classmethod
-    def _tool_from_agent(cls, agent: "Agent"):
+    def _tool_from_agent(cls, agent: "Agent", end: bool = False):
         async def invoke_agent(input_task: str):
             return cast(StepResult, await agent.a_run(input_task)).text
 
@@ -165,6 +165,7 @@ class Agent:
             func=invoke_agent,
             name=agent.name,
             description=agent.__doc__,
+            end=end,
         )
         return a_tool
 
@@ -196,8 +197,8 @@ class Agent:
             if isinstance(block, FunctionCallBlock)
         )
 
-    def as_tool(self):
-        return Agent._tool_from_agent(self)
+    def as_tool(self, end: bool = False):
+        return Agent._tool_from_agent(self, end=end)
 
     def _add_tool(self, tool: Tool):
         self._tools.append(tool)

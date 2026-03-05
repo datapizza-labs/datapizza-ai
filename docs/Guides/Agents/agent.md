@@ -226,6 +226,41 @@ master_agent = MasterAgent(
 master_agent.run("What is the weather in Rome?")
 ```
 
+### End on agent-as-tool
+
+When converting an agent to a tool with `as_tool`, you can set `end=True` to mark
+that tool as terminal.
+
+This is useful for router/orchestrator agents that should stop immediately after
+delegating to a sub-agent.
+
+```python
+from datapizza.agents import Agent
+from datapizza.clients.openai import OpenAIClient
+
+client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1")
+
+text_agent = Agent(
+    name="text_rag",
+    client=client,
+    system_prompt="You answer questions using retrieved knowledge.",
+)
+text_agent_tool = text_agent.as_tool(end=True)
+
+orchestrator = Agent(
+    name="orchestrator",
+    client=client,
+    system_prompt="Route the user request to the best expert.",
+    tools=[text_agent_tool],
+)
+
+result = orchestrator.run("Help me solve this error in production")
+print(result.text)
+```
+
+`can_call` behavior is unchanged. If you need terminal behavior, add the
+sub-agent tool manually with `as_tool(end=True)`.
+
 
 
 ## Planning System
