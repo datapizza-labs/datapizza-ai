@@ -1,6 +1,9 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+from pydantic import BaseModel
+
 from datapizza.agents.agent import PLANNING_PROMT, Agent, StepResult
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
@@ -164,6 +167,63 @@ class TestBaseAgents:
         assert res[0].text == "H"
         assert res[1].text == "He"
         assert res[2].text == "Hel"
+
+    def test_agent_structured_output_sync(self):
+        class Person(BaseModel):
+            name: str
+            age: int
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        res = agent.run('{"name": "Alice", "age": 30}')
+        assert res
+        assert res.index == 1
+        assert res.text == ""
+        assert len(res.structured_data) == 1
+        assert res.structured_data[0] == Person(name="Alice", age=30)
+
+    def test_agent_structured_output_hard_fail_on_unsupported_client(self):
+        class Person(BaseModel):
+            name: str
+
+        class UnsupportedStructuredMockClient(MockClient):
+            def _structured_response(self, *args, **kwargs):
+                raise NotImplementedError("not supported")
+
+        agent = Agent(
+            name="test",
+            client=UnsupportedStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        with pytest.raises(ValueError, match="does not support structured responses"):
+            agent.run('{"name": "Alice"}')
+
+    def test_agent_structured_output_async_hard_fail_on_unsupported_client(self):
+        class Person(BaseModel):
+            name: str
+
+        class UnsupportedStructuredMockClient(MockClient):
+            def _a_structured_response(self, *args, **kwargs):
+                raise NotImplementedError("not supported")
+
+        agent = Agent(
+            name="test",
+            client=UnsupportedStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        with pytest.raises(
+            ValueError, match="does not support async structured responses"
+        ):
+            asyncio.run(agent.a_run('{"name": "Alice"}'))
 
 
 class TestStatelessAgents:

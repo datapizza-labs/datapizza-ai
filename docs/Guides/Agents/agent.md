@@ -73,6 +73,38 @@ res = master_agent.run(
 
 ## Core Methods
 
+## Structured output at agent level
+
+You can set `output_cls` on the agent to force every model turn in the agent loop
+to request structured output with that schema.
+
+No separate method is needed: use the same `run(...)` and `a_run(...)` APIs.
+
+```python
+from pydantic import BaseModel
+from datapizza.agents import Agent
+from datapizza.clients.openai import OpenAIClient
+
+
+class Person(BaseModel):
+    name: str
+    age: int
+
+
+agent = Agent(
+    name="person_extractor",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1-mini"),
+    output_cls=Person,
+)
+
+result = agent.run('{"name": "Alice", "age": 30}')
+person = result.structured_data[0]
+print(person.name)
+```
+
+If the selected client does not support structured responses, the agent raises a
+clear `ValueError` (hard-fail behavior).
+
 
 ### Sync run
 

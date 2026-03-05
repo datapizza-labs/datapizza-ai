@@ -19,6 +19,7 @@ from datapizza.type import (
     Block,
     FunctionCallBlock,
     FunctionCallResultBlock,
+    StructuredBlock,
     TextBlock,
 )
 
@@ -49,6 +50,14 @@ class StepResult:
     @property
     def tools_used(self) -> list[FunctionCallBlock]:
         return [block for block in self.content if isinstance(block, FunctionCallBlock)]
+
+    @property
+    def structured_data(self) -> list[BaseModel]:
+        return [
+            block.content
+            for block in self.content
+            if isinstance(block, StructuredBlock)
+        ]
 
 
 class Plan(BaseModel):
@@ -83,6 +92,7 @@ class Agent:
         logger: AgentLogger | None = None,
         planning_interval: int = 0,
         planning_prompt: str = PLANNING_PROMT,
+        output_cls: type[BaseModel] | None = None,
     ):
         """
         Initialize the agent.
@@ -104,6 +114,7 @@ class Agent:
             logger (AgentLogger, optional): The logger to use for the agent. Defaults to None.
             planning_interval (int, optional): The planning interval to use for the agent. Defaults to 0.
             planning_prompt (str, optional): The planning prompt to use for the agent planning steps. Defaults to PLANNING_PROMT.
+            output_cls (type[BaseModel], optional): If set, every agent model turn requests structured output of this class.
 
         """
         if not client:
@@ -135,6 +146,7 @@ class Agent:
         self._tools = tools or []
         self._planning_interval = planning_interval
         self._planning_prompt = planning_prompt
+        self._output_cls = output_cls
         self._memory = memory or Memory()
         self._stateless = stateless
 
@@ -314,6 +326,7 @@ class Agent:
             # Execute planning step
             step_output = None
             step_has_tools = False
+            step_has_structured = False
             for result in self._execute_planning_step(
                 current_steps, original_task, memory, **kwargs
             ):
@@ -322,10 +335,15 @@ class Agent:
                 elif isinstance(result, StepResult):
                     step_output = result.text
                     step_has_tools = bool(result.tools_used)
+                    step_has_structured = bool(result.structured_data)
                     yield result
 
             if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output
+                break
+
+            if self._output_cls and step_has_structured and not step_has_tools:
+                final_answer = ""
                 break
 
             if (
@@ -394,6 +412,7 @@ class Agent:
             # Execute planning step
             step_output = None
             step_has_tools = False
+            step_has_structured = False
             async for result in self._a_execute_planning_step(
                 current_steps, original_task, memory, **kwargs
             ):
@@ -402,10 +421,15 @@ class Agent:
                 elif isinstance(result, StepResult):
                     step_output = result.text
                     step_has_tools = bool(result.tools_used)
+                    step_has_structured = bool(result.structured_data)
                     yield result
 
             if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output
+                break
+
+            if self._output_cls and step_has_structured and not step_has_tools:
+                final_answer = ""
                 break
 
             if (
@@ -468,7 +492,24 @@ class Agent:
 
         # Check if streaming is enabled
         response: ClientResponse
-        if self._stream:
+        if self._output_cls:
+            try:
+                response = self._client.structured_response(
+                    input=planning_prompt,
+                    output_cls=self._output_cls,
+                    tools=self._tools,
+                    memory=memory,
+                    system_prompt=self.system_prompt,
+                    **kwargs,
+                )
+            except NotImplementedError as err:
+                raise ValueError(
+                    f"{self._client.__class__.__name__} does not support structured responses. "
+                    "Please use a client with structured output support or remove output_cls."
+                ) from err
+            step_usage += response.usage
+
+        elif self._stream:
             for chunk in self._client.stream_invoke(
                 input=planning_prompt,
                 tools=self._tools,
@@ -500,6 +541,8 @@ class Agent:
 
         if response and response.text:
             memory.add_turn(TextBlock(content=response.text), role=ROLE.ASSISTANT)
+        elif response and response.structured_data:
+            memory.add_turn(response.content, role=ROLE.ASSISTANT)
 
         if response and response.function_calls:
             memory.add_turn(response.function_calls, role=ROLE.ASSISTANT)
@@ -527,7 +570,24 @@ class Agent:
         step_usage = TokenUsage()
         # Check if streaming is enabled
         response: ClientResponse
-        if self._stream:
+        if self._output_cls:
+            try:
+                response = await self._client.a_structured_response(
+                    input=planning_prompt,
+                    output_cls=self._output_cls,
+                    tools=self._tools,
+                    memory=memory,
+                    system_prompt=self.system_prompt,
+                    **kwargs,
+                )
+            except NotImplementedError as err:
+                raise ValueError(
+                    f"{self._client.__class__.__name__} does not support async structured responses. "
+                    "Please use a client with structured output support or remove output_cls."
+                ) from err
+            step_usage += response.usage
+
+        elif self._stream:
             async for chunk in self._client.a_stream_invoke(
                 input=planning_prompt,
                 tools=self._tools,
@@ -556,6 +616,8 @@ class Agent:
 
         if response.text:
             memory.add_turn(TextBlock(content=response.text), role=ROLE.ASSISTANT)
+        elif response.structured_data:
+            memory.add_turn(response.content, role=ROLE.ASSISTANT)
 
         if response.function_calls:
             memory.add_turn(response.function_calls, role=ROLE.ASSISTANT)
