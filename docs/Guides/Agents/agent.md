@@ -258,9 +258,28 @@ result = orchestrator.run("Help me solve this error in production")
 print(result.text)
 ```
 
-`can_call` behavior is unchanged. If you need terminal behavior, add the
-sub-agent tool manually with `as_tool(end=True)`.
+### Tool description in multi-agent
 
+You can set an agent description directly in `Agent(...)`.
+When the agent is converted to a tool with `as_tool()`, this description is used
+for function calling.
+
+```python
+text_agent = Agent(
+    name="text_rag",
+    description="Answers user questions using company knowledge base retrieval.",
+    client=client,
+    system_prompt="You answer questions using retrieved knowledge.",
+)
+
+tool = text_agent.as_tool(end=True)
+```
+
+If `description` is not provided, Datapizza uses this fallback order:
+
+1. agent description from `__init__`
+2. agent class docstring
+3. agent name
 
 
 ## Planning System

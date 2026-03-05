@@ -69,6 +69,7 @@ class Agent:
         name: str | None = None,
         client: Client | None = None,
         *,
+        description: str | None = None,
         system_prompt: str | None = None,
         tools: list[Tool] | None = None,
         max_steps: int | None = None,
@@ -89,6 +90,7 @@ class Agent:
         Args:
             name (str, optional): The name of the agent. Defaults to None.
             client (Client): The client to use for the agent. Defaults to None.
+            description (str, optional): Human-readable description used when converting the agent to a tool. Defaults to None.
             system_prompt (str, optional): The system prompt to use for the agent. Defaults to None.
 
             tools (list[Tool], optional): A list of tools to use with the agent. Defaults to None.
@@ -120,6 +122,10 @@ class Agent:
         self.name = name or self.name
         if not isinstance(self.name, str):
             raise ValueError("Name must be a string")
+
+        self.description = description
+        if self.description is not None and not isinstance(self.description, str):
+            raise ValueError("Description must be a string")
 
         self.system_prompt = system_prompt or self.system_prompt
         if not isinstance(self.system_prompt, str):
@@ -161,10 +167,14 @@ class Agent:
         async def invoke_agent(input_task: str):
             return cast(StepResult, await agent.a_run(input_task)).text
 
+        tool_description = (
+            getattr(agent, "description", None) or agent.__doc__ or agent.name
+        )
+
         a_tool = Tool(
             func=invoke_agent,
             name=agent.name,
-            description=agent.__doc__,
+            description=tool_description,
             end=end,
         )
         return a_tool

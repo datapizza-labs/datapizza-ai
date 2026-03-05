@@ -86,6 +86,49 @@ class TestBaseAgents:
         a_tool = agent.as_tool()
         assert a_tool.end_invoke is False
 
+    def test_as_tool_prefers_instance_description(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            description="My custom tool description",
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "My custom tool description"
+
+    def test_as_tool_description_fallback_to_docstring(self):
+        class TestDocAgent(Agent):
+            """Tool description from class docstring."""
+
+            name = "doc_agent"
+            system_prompt = "You are a test agent"
+
+        agent = TestDocAgent(client=MockClient())
+        a_tool = agent.as_tool()
+        assert a_tool.description == "Tool description from class docstring."
+
+    def test_as_tool_description_fallback_to_name(self):
+        agent = Agent(
+            name="name_fallback_agent",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "name_fallback_agent"
+
+    def test_as_tool_empty_description_fallback_to_name(self):
+        agent = Agent(
+            name="empty_description_agent",
+            client=MockClient(),
+            description="",
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "empty_description_agent"
+
     def test_params_as_class_attributes(self):
         class TestAgent(Agent):
             name = "test"
