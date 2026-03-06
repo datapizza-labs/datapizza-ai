@@ -1,4 +1,5 @@
 import warnings
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -143,3 +144,43 @@ class ClientResponse:
 
     def __str__(self) -> str:
         return f"ClientResponse(content={self.content}, delta={self.delta}, stop_reason={self.stop_reason})"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "content": [block.to_dict() for block in self.content],
+            "delta": self.delta,
+            "stop_reason": self.stop_reason,
+            "usage": self.usage.model_dump(mode="json"),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ClientResponse":
+        if not isinstance(data, dict):
+            raise ValueError("ClientResponse payload must be a dictionary")
+
+        raw_content = data.get("content", [])
+        if not isinstance(raw_content, list):
+            raise ValueError("ClientResponse content must be a list")
+
+        content: list[Block] = []
+        for item in raw_content:
+            if not isinstance(item, dict):
+                raise ValueError("ClientResponse block must be a dictionary")
+            content.append(Block.from_dict(item))
+
+        usage_data = data.get("usage")
+        usage = (
+            TokenUsage.model_validate(usage_data)
+            if isinstance(usage_data, dict)
+            else TokenUsage()
+        )
+
+        delta = data.get("delta")
+        stop_reason = data.get("stop_reason")
+
+        return cls(
+            content=content,
+            delta=delta if isinstance(delta, str) else None,
+            stop_reason=stop_reason if isinstance(stop_reason, str) else None,
+            usage=usage,
+        )
