@@ -70,6 +70,33 @@ res = master_agent.run(
 - `none`: force to not use any tool.
 
 
+## Step hooks
+
+You can observe the agent loop by passing a `hooks` object with `before_step` and `after_step` methods.
+
+```python
+from datapizza.agents import Agent, AgentHooks, StepContext, StepResult
+from datapizza.clients.openai import OpenAIClient
+
+
+class DebugHooks(AgentHooks):
+    def before_step(self, context: StepContext) -> None:
+        print(f"starting step {context.step_index}")
+
+    def after_step(self, context: StepContext, result: StepResult) -> None:
+        print(f"finished step {context.step_index}: {result.text}")
+
+
+agent = Agent(
+    name="my_agent",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+    hooks=DebugHooks(),
+)
+```
+
+`before_step` runs once at the start of each loop iteration. `after_step` runs once after the `StepResult` is produced.
+
+
 
 ## Core Methods
 

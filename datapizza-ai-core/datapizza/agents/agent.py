@@ -1,5 +1,6 @@
 import inspect
 from collections.abc import AsyncGenerator, Callable, Generator
+from dataclasses import dataclass
 from functools import wraps
 from threading import Lock
 from typing import Any, Literal, Union, cast
@@ -69,6 +70,23 @@ class Plan(BaseModel):
         return f"I need to solve the task:\n\n{self.task}\n\nHere is the plan:\n\n - {separator.join(self.steps)}"
 
 
+@dataclass
+class StepContext:
+    agent: "Agent"
+    step_index: int
+    task_input: str
+    memory: Memory
+    tool_choice: Literal["auto", "required", "none", "required_first"] | list[str]
+
+
+class AgentHooks:
+    def before_step(self, context: StepContext) -> None:
+        pass
+
+    def after_step(self, context: StepContext, result: StepResult) -> None:
+        pass
+
+
 class Agent:
     name: str
     system_prompt: str = "You are a helpful assistant."
@@ -93,6 +111,7 @@ class Agent:
         planning_interval: int = 0,
         planning_prompt: str = PLANNING_PROMT,
         output_cls: type[BaseModel] | None = None,
+        hooks: AgentHooks | None = None,
     ):
         """
         Initialize the agent.
@@ -115,6 +134,7 @@ class Agent:
             planning_interval (int, optional): The planning interval to use for the agent. Defaults to 0.
             planning_prompt (str, optional): The planning prompt to use for the agent planning steps. Defaults to PLANNING_PROMT.
             output_cls (type[BaseModel], optional): If set, every agent model turn requests structured output of this class.
+            hooks (AgentHooks, optional): Hook callbacks invoked before and after each step.
 
         """
         if not client:
@@ -147,6 +167,7 @@ class Agent:
         self._planning_interval = planning_interval
         self._planning_prompt = planning_prompt
         self._output_cls = output_cls
+        self._hooks = hooks
         self._memory = memory or Memory()
         self._stateless = stateless
 
@@ -293,12 +314,23 @@ class Agent:
             self._max_steps is None
             or (self._max_steps and current_steps <= self._max_steps)
         ):
+            result: StepResult | ClientResponse | None = None
             kwargs["tool_choice"] = tool_choice
             if tool_choice == "required_first":
                 if current_steps == 1:
                     kwargs["tool_choice"] = "required"
                 else:
                     kwargs["tool_choice"] = "auto"
+
+            context = StepContext(
+                agent=self,
+                step_index=current_steps,
+                task_input=original_task,
+                memory=memory,
+                tool_choice=kwargs["tool_choice"],
+            )
+            if self._hooks:
+                self._hooks.before_step(context)
 
             self._logger.debug(f"--- STEP {current_steps} ---")
 
@@ -337,6 +369,9 @@ class Agent:
                     step_has_tools = bool(result.tools_used)
                     step_has_structured = bool(result.structured_data)
                     yield result
+
+            if self._hooks and isinstance(result, StepResult):
+                self._hooks.after_step(context, result)
 
             if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output
@@ -377,12 +412,23 @@ class Agent:
             self._max_steps is None
             or (self._max_steps and current_steps <= self._max_steps)
         ):
+            result: StepResult | ClientResponse | None = None
             kwargs["tool_choice"] = tool_choice
             if tool_choice == "required_first":
                 if current_steps == 1:
                     kwargs["tool_choice"] = "required"
                 else:
                     kwargs["tool_choice"] = "auto"
+
+            context = StepContext(
+                agent=self,
+                step_index=current_steps,
+                task_input=original_task,
+                memory=memory,
+                tool_choice=kwargs["tool_choice"],
+            )
+            if self._hooks:
+                self._hooks.before_step(context)
 
             # step_action = StepResult(index=current_steps)
             self._logger.debug(f"--- STEP {current_steps} ---")
@@ -423,6 +469,9 @@ class Agent:
                     step_has_tools = bool(result.tools_used)
                     step_has_structured = bool(result.structured_data)
                     yield result
+
+            if self._hooks and isinstance(result, StepResult):
+                self._hooks.after_step(context, result)
 
             if step_output and self._terminate_on_text and not step_has_tools:
                 final_answer = step_output

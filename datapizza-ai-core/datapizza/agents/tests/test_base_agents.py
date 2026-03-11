@@ -4,7 +4,13 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from pydantic import BaseModel
 
-from datapizza.agents.agent import PLANNING_PROMT, Agent, StepResult
+from datapizza.agents.agent import (
+    PLANNING_PROMT,
+    Agent,
+    AgentHooks,
+    StepContext,
+    StepResult,
+)
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
 from datapizza.tools import tool
@@ -224,6 +230,97 @@ class TestBaseAgents:
             ValueError, match="does not support async structured responses"
         ):
             asyncio.run(agent.a_run('{"name": "Alice"}'))
+
+    def test_agent_hooks_run_single_step(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        res = agent.run("Hello")
+
+        assert res.text == "Hello"
+        assert events == [("before", 1, "Hello"), ("after", 1, "Hello")]
+
+    def test_agent_hooks_run_multiple_steps(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            hooks=TestHooks(),
+        )
+
+        res = agent.run("function call")
+
+        assert res.index == 2
+        assert events == [
+            ("before", 1, "function call"),
+            ("after", 1, ""),
+            ("before", 2, ""),
+            ("after", 2, "tool called"),
+        ]
+
+    def test_agent_hooks_async(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        res = asyncio.run(agent.a_run("Hello"))
+
+        assert res.text == "Hello"
+        assert events == [("before", 1, "Hello"), ("after", 1, "Hello")]
+
+    def test_agent_hooks_exception_bubbles(self):
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                raise RuntimeError("hook failed")
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        with pytest.raises(RuntimeError, match="hook failed"):
+            agent.run("Hello")
 
 
 class TestStatelessAgents:
