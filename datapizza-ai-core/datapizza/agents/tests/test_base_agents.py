@@ -11,9 +11,11 @@ from datapizza.agents.agent import (
     StepContext,
     StepResult,
 )
+from datapizza.agents.runner import AgentRunner
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
 from datapizza.tools import tool
+from datapizza.type import FunctionCallBlock, TextBlock
 
 
 class TestBaseAgents:
@@ -496,3 +498,149 @@ class TestStatelessAgents:
         res = asyncio.run(agent.a_run("mixed function call"))
         assert res.index == 2
         assert res.text == "tool called"
+
+
+class HandoffMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        if tools is None:
+            tools = []
+
+        input_text = ""
+        if isinstance(input, list):
+            for block in input:
+                if isinstance(block, TextBlock):
+                    input_text = block.content
+
+        if input_text == "handoff":
+            handoff_tool = next(
+                tool for tool in tools if tool.name == "transfer_to_specialist"
+            )
+            return ClientResponse(
+                content=[
+                    FunctionCallBlock(
+                        id="handoff-1",
+                        arguments={
+                            "task_input": "delegated",
+                            "reason": "needs specialist",
+                        },
+                        name=handoff_tool.name,
+                        tool=handoff_tool,
+                    )
+                ]
+            )
+
+        if input_text == "delegated":
+            return ClientResponse(
+                content=[TextBlock(content=f"shared:{len(memory) if memory else 0}")]
+            )
+
+        return super()._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class TestAgentRunner:
+    def test_agent_run_preserves_stepresult_with_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            stateless=False,
+            handoffs=[specialist],
+        )
+
+        result = root.run("handoff")
+
+        assert isinstance(result, StepResult)
+        assert result.text == "shared:3"
+        assert len(root._memory) == 5
+
+    def test_runner_returns_high_level_handoff_result(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = AgentRunner().run(root, "handoff")
+
+        assert result.final_step is not None
+        assert result.final_step.text == "shared:3"
+        assert result.final_agent is specialist
+        assert result.handoff_count == 1
+        assert result.visited_agents == ["root", "specialist"]
+        memory_dict = result.memory.to_dict()
+        serialized_memory = str(memory_dict)
+        assert "Transfer to specialist completed" in serialized_memory
+
+    def test_runner_async_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = asyncio.run(root.a_run("handoff"))
+
+        assert result is not None
+        assert result.text == "shared:3"
+
+    def test_stream_invoke_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        results = list(root.stream_invoke("handoff"))
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "shared:3"
+
+    def test_a_stream_invoke_handoff(self):
+        async def run_stream():
+            specialist = Agent(
+                name="specialist",
+                client=HandoffMockClient(),
+                system_prompt="You are a specialist",
+            )
+            root = Agent(
+                name="root",
+                client=HandoffMockClient(),
+                system_prompt="You are a root agent",
+                handoffs=[specialist],
+            )
+
+            results = []
+            async for item in root.a_stream_invoke("handoff"):
+                results.append(item)
+            return results
+
+        results = asyncio.run(run_stream())
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "shared:3"

@@ -1,7 +1,6 @@
-import inspect
-from collections.abc import AsyncGenerator, Callable, Generator
+import asyncio
+from collections.abc import AsyncGenerator, Generator
 from dataclasses import dataclass
-from functools import wraps
 from threading import Lock
 from typing import Any, Literal, Union, cast
 
@@ -10,25 +9,22 @@ from pydantic import BaseModel
 from datapizza.agents.logger import AgentLogger
 from datapizza.core.clients import Client, ClientResponse
 from datapizza.core.clients.models import TokenUsage
-from datapizza.core.executors.async_executor import AsyncExecutor
-from datapizza.core.utils import sum_token_usage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.tracing.tracing import agent_span, tool_span
 from datapizza.type import (
-    ROLE,
     Block,
     FunctionCallBlock,
-    FunctionCallResultBlock,
     StructuredBlock,
     TextBlock,
 )
 
-PLANNING_PROMT = """in this moment you just tell me what you are going to do.
+PLANNING_PROMPT = """in this moment you just tell me what you are going to do.
 You need to define the next steps to solve the task.
 Do not use tools to solve the task.
 Do not solve the task, just plan the next steps.
 """
+
+PLANNING_PROMT = PLANNING_PROMPT
 
 
 class StepResult:
@@ -109,9 +105,10 @@ class Agent:
         can_call: list["Agent"] | None = None,
         logger: AgentLogger | None = None,
         planning_interval: int = 0,
-        planning_prompt: str = PLANNING_PROMT,
+        planning_prompt: str = PLANNING_PROMPT,
         output_cls: type[BaseModel] | None = None,
         hooks: AgentHooks | None = None,
+        handoffs: list["Agent"] | None = None,
     ):
         """
         Initialize the agent.
@@ -164,6 +161,7 @@ class Agent:
 
         self._client = client
         self._tools = tools or []
+        self._handoffs = handoffs or []
         self._planning_interval = planning_interval
         self._planning_prompt = planning_prompt
         self._output_cls = output_cls
@@ -187,6 +185,7 @@ class Agent:
             self._add_tool(tool)
 
         self._lock = Lock()
+        self._async_lock = asyncio.Lock()
 
     def can_call(self, agent: Union[list["Agent"], "Agent"]):
         if isinstance(agent, Agent):
@@ -195,10 +194,17 @@ class Agent:
         for a in agent:
             self._tools.append(a.as_tool())
 
+    def can_handoff(self, agent: Union[list["Agent"], "Agent"]):
+        if isinstance(agent, Agent):
+            agent = [agent]
+
+        self._handoffs.extend(agent)
+
     @classmethod
     def _tool_from_agent(cls, agent: "Agent", end: bool = False):
         async def invoke_agent(input_task: str):
-            return cast(StepResult, await agent.a_run(input_task)).text
+            result = await agent.a_run(input_task)
+            return cast(StepResult, result).text
 
         tool_description = (
             getattr(agent, "description", None) or agent.__doc__ or agent.name
@@ -211,25 +217,6 @@ class Agent:
             end=end,
         )
         return a_tool
-
-    @staticmethod
-    def _lock_if_not_stateless(func: Callable):
-        @wraps(func)
-        def decorated(self, *args, **kwargs):
-            if not self._stateless and inspect.isgeneratorfunction(func):
-                # For generators, we need a locking wrapper
-                def locking_generator():
-                    with self._lock:
-                        yield from func(self, *args, **kwargs)
-
-                return locking_generator()
-            elif not self._stateless:
-                with self._lock:
-                    return func(self, *args, **kwargs)
-            else:
-                return func(self, *args, **kwargs)
-
-        return decorated
 
     @staticmethod
     def _contains_ending_tool(step: StepResult) -> bool:
@@ -256,7 +243,6 @@ class Agent:
 
         return tools
 
-    @_lock_if_not_stateless
     def stream_invoke(
         self,
         task_input: str,
@@ -276,9 +262,10 @@ class Agent:
             The intermediate steps and final result of the agent's execution
 
         """
-        yield from self._invoke_stream(task_input, tool_choice, **gen_kwargs)
+        from datapizza.agents.runner import AgentRunner
 
-    @_lock_if_not_stateless
+        yield from AgentRunner().stream(self, task_input, tool_choice, **gen_kwargs)
+
     async def a_stream_invoke(
         self,
         task_input: str,
@@ -298,445 +285,13 @@ class Agent:
             The intermediate steps and final result of the agent's execution
 
         """
-        async for step in self._a_invoke_stream(task_input, tool_choice, **gen_kwargs):
+        from datapizza.agents.runner import AgentRunner
+
+        async for step in AgentRunner().a_stream(
+            self, task_input, tool_choice, **gen_kwargs
+        ):
             yield step
 
-    def _invoke_stream(
-        self, task_input: str, tool_choice, **kwargs
-    ) -> Generator[ClientResponse | StepResult | Plan | None, None]:
-        self._logger.debug("STARTING AGENT")
-        final_answer = None
-        current_steps = 1
-        memory = self._memory.copy()
-        original_task = task_input
-
-        while final_answer is None and (
-            self._max_steps is None
-            or (self._max_steps and current_steps <= self._max_steps)
-        ):
-            result: StepResult | ClientResponse | None = None
-            kwargs["tool_choice"] = tool_choice
-            if tool_choice == "required_first":
-                if current_steps == 1:
-                    kwargs["tool_choice"] = "required"
-                else:
-                    kwargs["tool_choice"] = "auto"
-
-            context = StepContext(
-                agent=self,
-                step_index=current_steps,
-                task_input=original_task,
-                memory=memory,
-                tool_choice=kwargs["tool_choice"],
-            )
-            if self._hooks:
-                self._hooks.before_step(context)
-
-            self._logger.debug(f"--- STEP {current_steps} ---")
-
-            # Planning step if interval is set
-            if self._planning_interval and (
-                current_steps == 1 or (current_steps - 1) % self._planning_interval == 0
-            ):
-                plan = self._create_planning_prompt(
-                    original_task, memory, current_steps
-                )
-                assert isinstance(plan, Plan)
-                memory.add_turn(
-                    TextBlock(content=str(plan)),
-                    role=ROLE.ASSISTANT,
-                )
-                memory.add_turn(
-                    TextBlock(content="Ok, go ahead and now execute the plan."),
-                    role=ROLE.USER,
-                )
-
-                yield plan
-
-                self._logger.log_panel(str(plan), title="PLAN")
-
-            # Execute planning step
-            step_output = None
-            step_has_tools = False
-            step_has_structured = False
-            for result in self._execute_planning_step(
-                current_steps, original_task, memory, **kwargs
-            ):
-                if isinstance(result, ClientResponse):
-                    yield result
-                elif isinstance(result, StepResult):
-                    step_output = result.text
-                    step_has_tools = bool(result.tools_used)
-                    step_has_structured = bool(result.structured_data)
-                    yield result
-
-            if self._hooks and isinstance(result, StepResult):
-                self._hooks.after_step(context, result)
-
-            if step_output and self._terminate_on_text and not step_has_tools:
-                final_answer = step_output
-                break
-
-            if self._output_cls and step_has_structured and not step_has_tools:
-                final_answer = ""
-                break
-
-            if (
-                result
-                and isinstance(result, StepResult)
-                and Agent._contains_ending_tool(result)
-            ):
-                self._logger.debug("ending tool found, ending agent")
-                break
-
-            current_steps += 1
-            original_task = ""
-
-        # Yield final answer if we have one
-        if final_answer:
-            self._logger.log_panel(final_answer, title="FINAL ANSWER")
-
-        if not self._stateless:
-            self._memory = memory
-
-    async def _a_invoke_stream(
-        self, task_input: str, tool_choice, **kwargs
-    ) -> AsyncGenerator[ClientResponse | StepResult | Plan | None]:
-        self._logger.debug("STARTING AGENT")
-        final_answer = None
-        current_steps = 1
-        memory = self._memory.copy()
-        original_task = task_input
-
-        while final_answer is None and (
-            self._max_steps is None
-            or (self._max_steps and current_steps <= self._max_steps)
-        ):
-            result: StepResult | ClientResponse | None = None
-            kwargs["tool_choice"] = tool_choice
-            if tool_choice == "required_first":
-                if current_steps == 1:
-                    kwargs["tool_choice"] = "required"
-                else:
-                    kwargs["tool_choice"] = "auto"
-
-            context = StepContext(
-                agent=self,
-                step_index=current_steps,
-                task_input=original_task,
-                memory=memory,
-                tool_choice=kwargs["tool_choice"],
-            )
-            if self._hooks:
-                self._hooks.before_step(context)
-
-            # step_action = StepResult(index=current_steps)
-            self._logger.debug(f"--- STEP {current_steps} ---")
-            # yield step_action
-
-            # Planning step if interval is set
-            if self._planning_interval and (
-                current_steps == 1 or (current_steps - 1) % self._planning_interval == 0
-            ):
-                plan = await self._a_create_planning_prompt(
-                    original_task, memory, current_steps
-                )
-                assert isinstance(plan, Plan)
-                memory.add_turn(
-                    TextBlock(content=str(plan)),
-                    role=ROLE.ASSISTANT,
-                )
-                memory.add_turn(
-                    TextBlock(content="Ok, go ahead and now execute the plan."),
-                    role=ROLE.USER,
-                )
-
-                yield plan
-
-                self._logger.log_panel(str(plan), title="PLAN")
-
-            # Execute planning step
-            step_output = None
-            step_has_tools = False
-            step_has_structured = False
-            async for result in self._a_execute_planning_step(
-                current_steps, original_task, memory, **kwargs
-            ):
-                if isinstance(result, ClientResponse):
-                    yield result
-                elif isinstance(result, StepResult):
-                    step_output = result.text
-                    step_has_tools = bool(result.tools_used)
-                    step_has_structured = bool(result.structured_data)
-                    yield result
-
-            if self._hooks and isinstance(result, StepResult):
-                self._hooks.after_step(context, result)
-
-            if step_output and self._terminate_on_text and not step_has_tools:
-                final_answer = step_output
-                break
-
-            if self._output_cls and step_has_structured and not step_has_tools:
-                final_answer = ""
-                break
-
-            if (
-                result
-                and isinstance(result, StepResult)
-                and Agent._contains_ending_tool(result)
-            ):
-                self._logger.debug("ending tool found, ending agent")
-                break
-
-            current_steps += 1
-            original_task = ""
-
-        # Yield final answer if we have one
-        if final_answer:
-            self._logger.log_panel(final_answer, title="FINAL ANSWER")
-
-        if not self._stateless:
-            self._memory = memory
-
-    def _create_planning_prompt(
-        self, original_task: str, memory: Memory, step_number: int
-    ) -> Plan:
-        """Create a planning prompt that asks the agent to define next steps."""
-
-        prompt = self.system_prompt + self._planning_prompt
-
-        client_response = self._client.structured_response(
-            input=original_task,
-            tools=self._tools,
-            tool_choice="none",
-            memory=memory,
-            system_prompt=prompt,
-            output_cls=Plan,
-        )
-        return Plan(**client_response.structured_data[0].model_dump())
-
-    async def _a_create_planning_prompt(
-        self, original_task: str, memory: Memory, step_number: int
-    ) -> Plan:
-        """Create a planning prompt that asks the agent to define next steps."""
-        prompt = self.system_prompt + self._planning_prompt
-
-        client_response = await self._client.a_structured_response(
-            input=original_task,
-            tools=self._tools,
-            tool_choice="none",
-            memory=memory,
-            system_prompt=prompt,
-            output_cls=Plan,
-        )
-        return Plan(**client_response.structured_data[0].model_dump())
-
-    def _execute_planning_step(
-        self, current_step, planning_prompt: str, memory: Memory, **kwargs
-    ) -> Generator[StepResult | ClientResponse, None, None]:
-        """Execute a planning step with streaming support."""
-        tool_results = []
-        step_usage = TokenUsage()
-
-        # Check if streaming is enabled
-        response: ClientResponse
-        if self._output_cls:
-            try:
-                response = self._client.structured_response(
-                    input=planning_prompt,
-                    output_cls=self._output_cls,
-                    tools=self._tools,
-                    memory=memory,
-                    system_prompt=self.system_prompt,
-                    **kwargs,
-                )
-            except NotImplementedError as err:
-                raise ValueError(
-                    f"{self._client.__class__.__name__} does not support structured responses. "
-                    "Please use a client with structured output support or remove output_cls."
-                ) from err
-            step_usage += response.usage
-
-        elif self._stream:
-            for chunk in self._client.stream_invoke(
-                input=planning_prompt,
-                tools=self._tools,
-                memory=memory,
-                system_prompt=self.system_prompt,
-                **kwargs,
-            ):
-                step_usage += chunk.usage
-                response = chunk
-                if chunk.delta:
-                    yield chunk
-
-        else:
-            # Use regular non-streaming generation
-            response = self._client.invoke(
-                input=planning_prompt,
-                tools=self._tools,
-                memory=memory,
-                system_prompt=self.system_prompt,
-                **kwargs,
-            )
-            step_usage += response.usage
-
-        if not response:
-            raise RuntimeError("No response from client")
-
-        if planning_prompt:
-            memory.add_turn(TextBlock(content=planning_prompt), role=ROLE.USER)
-
-        if response and response.text:
-            memory.add_turn(TextBlock(content=response.text), role=ROLE.ASSISTANT)
-        elif response and response.structured_data:
-            memory.add_turn(response.content, role=ROLE.ASSISTANT)
-
-        if response and response.function_calls:
-            memory.add_turn(response.function_calls, role=ROLE.ASSISTANT)
-
-        for tool_call in response.function_calls:
-            tool_results.append(self._execute_tool(tool_call))
-
-        if tool_results:
-            for x in tool_results:
-                memory.add_turn(x, role=ROLE.TOOL)
-
-        step_action = StepResult(
-            index=current_step,
-            content=response.content + tool_results,
-            usage=response.usage,
-        )
-
-        yield step_action
-
-    async def _a_execute_planning_step(
-        self, current_step, planning_prompt: str, memory: Memory, **kwargs
-    ) -> AsyncGenerator[StepResult | ClientResponse, None]:
-        """Execute a planning step with streaming support."""
-        tool_results = []
-        step_usage = TokenUsage()
-        # Check if streaming is enabled
-        response: ClientResponse
-        if self._output_cls:
-            try:
-                response = await self._client.a_structured_response(
-                    input=planning_prompt,
-                    output_cls=self._output_cls,
-                    tools=self._tools,
-                    memory=memory,
-                    system_prompt=self.system_prompt,
-                    **kwargs,
-                )
-            except NotImplementedError as err:
-                raise ValueError(
-                    f"{self._client.__class__.__name__} does not support async structured responses. "
-                    "Please use a client with structured output support or remove output_cls."
-                ) from err
-            step_usage += response.usage
-
-        elif self._stream:
-            async for chunk in self._client.a_stream_invoke(
-                input=planning_prompt,
-                tools=self._tools,
-                memory=memory,
-                system_prompt=self.system_prompt,
-                **kwargs,
-            ):
-                step_usage += chunk.usage
-                response = chunk
-                if chunk.delta:
-                    yield chunk
-
-        else:
-            # Use regular non-streaming generation
-            response = await self._client.a_invoke(
-                input=planning_prompt,
-                tools=self._tools,
-                memory=memory,
-                system_prompt=self.system_prompt,
-                **kwargs,
-            )
-            step_usage += response.usage
-
-        if planning_prompt:
-            memory.add_turn(TextBlock(content=planning_prompt), role=ROLE.USER)
-
-        if response.text:
-            memory.add_turn(TextBlock(content=response.text), role=ROLE.ASSISTANT)
-        elif response.structured_data:
-            memory.add_turn(response.content, role=ROLE.ASSISTANT)
-
-        if response.function_calls:
-            memory.add_turn(response.function_calls, role=ROLE.ASSISTANT)
-
-        for tool_call in response.function_calls:
-            tool_results.append(await self._a_execute_tool(tool_call))
-
-        if tool_results:
-            for x in tool_results:
-                memory.add_turn(x, role=ROLE.TOOL)
-
-        step_action = StepResult(
-            index=current_step,
-            content=response.content + tool_results,
-            usage=response.usage,
-        )
-
-        yield step_action
-
-    def _execute_tool(
-        self, function_call: FunctionCallBlock
-    ) -> FunctionCallResultBlock:
-        with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute(
-                "tool_arguments", str(function_call.arguments)
-            )
-            result = function_call.tool(**function_call.arguments)
-
-            if inspect.iscoroutine(result):
-                result = AsyncExecutor.get_instance().run(result)
-
-            if result:
-                current_tool_span.set_attribute("tool_result", result)
-                self._logger.log_panel(
-                    result,
-                    title=f"TOOL {function_call.tool.name.upper()} RESULT",
-                    subtitle="args: " + str(function_call.arguments),
-                )
-            return FunctionCallResultBlock(
-                id=function_call.id,
-                tool=function_call.tool,
-                result=result,
-            )
-
-    async def _a_execute_tool(
-        self, function_call: FunctionCallBlock
-    ) -> FunctionCallResultBlock:
-        with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute(
-                "tool_arguments", str(function_call.arguments)
-            )
-            result = function_call.tool(**function_call.arguments)
-
-            if inspect.iscoroutine(result):
-                result = await result
-
-            if result:
-                current_tool_span.set_attribute("tool_result", result)
-                self._logger.log_panel(
-                    result,
-                    title=f"TOOL {function_call.tool.name.upper()} RESULT",
-                    subtitle="args: " + str(function_call.arguments),
-                )
-            return FunctionCallResultBlock(
-                id=function_call.id,
-                tool=function_call.tool,
-                result=result,
-            )
-
-    @_lock_if_not_stateless
     def run(
         self,
         task_input: str,
@@ -755,23 +310,11 @@ class Agent:
         Returns:
             The final result of the agent's execution
         """
-        with agent_span(f"Agent {self.name}"):
-            usage = TokenUsage()
-            steps = list[ClientResponse | StepResult | Plan | None](
-                self._invoke_stream(task_input, tool_choice, **gen_kwargs)
-            )
-            usage += sum_token_usage(
-                [step.usage for step in steps if isinstance(step, StepResult)]
-            )
+        from datapizza.agents.runner import AgentRunner
 
-            last_step = cast(
-                StepResult,
-                steps[-1],
-            )
-            last_step.usage = usage
-            return last_step
+        result = AgentRunner().run(self, task_input, tool_choice, **gen_kwargs)
+        return result.final_step
 
-    @_lock_if_not_stateless
     async def a_run(
         self,
         task_input: str,
@@ -790,18 +333,7 @@ class Agent:
         Returns:
             The final result of the agent's execution
         """
-        with agent_span(f"Agent {self.name}"):
-            total_usage = TokenUsage()
-            results = []
-            async for result in self._a_invoke_stream(
-                task_input, tool_choice, **gen_kwargs
-            ):
-                results.append(result)
+        from datapizza.agents.runner import AgentRunner
 
-            total_usage += sum_token_usage(
-                [result.usage for result in results if isinstance(result, StepResult)]
-            )
-            last_result = results[-1] if results else None
-            if last_result:
-                last_result.usage = total_usage
-            return last_result
+        result = await AgentRunner().a_run(self, task_input, tool_choice, **gen_kwargs)
+        return result.final_step
