@@ -311,6 +311,15 @@ print(result.final_step.text)
 print(result.final_agent.name)
 ```
 
+`AgentRunner.run(...)` returns an `AgentRunnerResult` with these fields:
+
+- `final_step`: the final `StepResult`
+- `final_agent`: the agent that produced the final answer
+- `handoff_count`: how many handoffs happened during the run
+- `visited_agents`: the sequence of agents visited during the run
+- `memory`: the shared `Memory` used for the run
+- `usage`: aggregated `TokenUsage` for the whole run
+
 ## Observe the agent loop
 
 Use hooks when you want to log or inspect each step.
