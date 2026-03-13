@@ -82,3 +82,25 @@ The output will vary depending on the live content of the URL. For `https://lore
 --- Running agent for: 'Summarize the main points of the article at https://loremipsum.io/' ---
 Agent Response: The article on **loremipsum.io** provides a comprehensive overview of "Lorem Ipsum," which is a placeholder text commonly used in the graphic, print, and publishing industries. Here are the main points:
 ```
+
+> ⚠️ **Warning**: This tool accepts unsanitized URLs. If exposed to untrusted input, it could be exploited for **Server-Side Request Forgery (SSRF)**, such as accessing internal services or cloud metadata endpoints (e.g., `http://169.254.169.254/`).
+
+**Best Practices**:
+- Always validate URLs before processing (e.g., allowlist trusted domains).
+- Avoid exposing this tool to uncontrolled input in production environments.
+- Use `paths_to_include` and `paths_to_exclude` to restrict access to sensitive resources.
+
+**Example: URL Validation in Python**
+```python
+from urllib.parse import urlparse
+
+def is_safe_url(url, allowed_domains):
+    # Check if a URL belongs to a list of allowed domains.
+    parsed = urlparse(url)
+    return parsed.netloc in allowed_domains
+
+# Usage:
+allowed_domains = ["api.trusted-service.com", "public-data.example.org"]
+if not is_safe_url(user_input_url, allowed_domains):
+    raise ValueError("URL not allowed")
+```
