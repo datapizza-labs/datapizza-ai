@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-cache-redis"
-version = "0.0.3"
+version = "0.0.4"
 description = "An implementation using Redis for datapizza-ai cache"
 readme = "README.md"
 license = {text = "MIT"}
