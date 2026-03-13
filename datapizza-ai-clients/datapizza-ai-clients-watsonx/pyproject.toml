@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-watsonx"
-version = "0.0.1"
+version = "0.0.2"
 description = "Ibm WatsonX client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}

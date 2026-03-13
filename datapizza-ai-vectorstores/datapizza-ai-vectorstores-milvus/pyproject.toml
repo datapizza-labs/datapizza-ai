@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-vectorstores-milvus"
-version = "0.0.1"
+version = "0.0.2"
 description = "Milvus vectorstore for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}

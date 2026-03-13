@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-tools-web-fetch"
-version = "0.0.2"
+version = "0.0.3"
 description = "A tool for fetching web content in the Datapizza AI framework."
 readme = "README.md"
 license = {text = "MIT"}
