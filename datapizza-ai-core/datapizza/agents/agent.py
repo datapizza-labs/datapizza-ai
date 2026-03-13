@@ -251,8 +251,10 @@ class Agent:
     def stream_invoke(
         self,
         task_input: str,
+        *,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> Generator[ClientResponse | StepResult | Plan | None, None]:
         """
@@ -269,13 +271,17 @@ class Agent:
         """
         from datapizza.agents.runner import AgentRunner
 
-        yield from AgentRunner().stream(self, task_input, tool_choice, **gen_kwargs)
+        yield from AgentRunner().stream(
+            self, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
 
     async def a_stream_invoke(
         self,
         task_input: str,
+        *,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> AsyncGenerator[ClientResponse | StepResult | Plan | None]:
         """
@@ -293,15 +299,17 @@ class Agent:
         from datapizza.agents.runner import AgentRunner
 
         async for step in AgentRunner().a_stream(
-            self, task_input, tool_choice, **gen_kwargs
+            self, task_input, tool_choice, memory=memory, **gen_kwargs
         ):
             yield step
 
     def run(
         self,
         task_input: str,
+        *,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> StepResult | None:
         """
@@ -317,14 +325,18 @@ class Agent:
         """
         from datapizza.agents.runner import AgentRunner
 
-        result = AgentRunner().run(self, task_input, tool_choice, **gen_kwargs)
+        result = AgentRunner().run(
+            self, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
         return result.final_step
 
     async def a_run(
         self,
         task_input: str,
+        *,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> StepResult | None:
         """
@@ -340,5 +352,7 @@ class Agent:
         """
         from datapizza.agents.runner import AgentRunner
 
-        result = await AgentRunner().a_run(self, task_input, tool_choice, **gen_kwargs)
+        result = await AgentRunner().a_run(
+            self, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
         return result.final_step

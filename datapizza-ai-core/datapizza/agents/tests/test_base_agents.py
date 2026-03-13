@@ -16,8 +16,9 @@ from datapizza.agents.runner import AgentRunner
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
 from datapizza.core.clients.models import TokenUsage
+from datapizza.memory import Memory
 from datapizza.tools import tool
-from datapizza.type import FunctionCallBlock, TextBlock
+from datapizza.type import ROLE, FunctionCallBlock, TextBlock
 
 
 class TestBaseAgents:
@@ -663,7 +664,50 @@ class CyclingHandoffMockClient(MockClient):
         return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
 
 
+class RuntimeMemoryMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        return ClientResponse(
+            content=[TextBlock(content=f"turns:{len(memory) if memory else 0}")]
+        )
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class GenKwargsEchoMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        temperature = kwargs.get("temperature")
+        return ClientResponse(content=[TextBlock(content=f"temperature:{temperature}")])
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
 class TestAgentRunner:
+    def test_agent_run_requires_keyword_tool_choice(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        with pytest.raises(
+            TypeError, match="takes 2 positional arguments but 3 were given"
+        ):
+            agent.run("hello", "required")
+
+    def test_agent_run_preserves_gen_kwargs_with_keyword_only_signature(self):
+        agent = Agent(
+            name="test",
+            client=GenKwargsEchoMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = agent.run("hello", temperature=0.2)
+
+        assert result is not None
+        assert result.text == "temperature:0.2"
+
     def test_streaming_run_aggregates_usage(self):
         agent = Agent(
             name="streaming",
@@ -800,3 +844,136 @@ class TestAgentRunner:
 
         with pytest.raises(RuntimeError, match="Maximum handoffs exceeded"):
             list(runner.stream(agent_a, "start"))
+
+    def test_run_accepts_runtime_memory(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = agent.run("hello", memory=memory)
+
+        assert result is not None
+        assert result.text == "turns:1"
+        assert len(memory) == 1
+
+    def test_runtime_memory_does_not_replace_stateful_agent_memory(self):
+        default_memory = Memory()
+        default_memory.add_turn(TextBlock(content="default history"), role=ROLE.USER)
+        runtime_memory = Memory()
+        runtime_memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+            stateless=False,
+            memory=default_memory,
+        )
+
+        result = agent.run("hello", memory=runtime_memory)
+
+        assert result is not None
+        assert result.text == "turns:1"
+        assert agent._memory is default_memory
+        assert len(agent._memory) == 1
+        assert len(runtime_memory) == 1
+
+    def test_handoff_uses_runtime_memory(self):
+        runtime_memory = Memory()
+        runtime_memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = root.run("handoff", memory=runtime_memory)
+
+        assert result is not None
+        assert result.text == "shared:4"
+
+    def test_runner_accepts_runtime_memory(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = AgentRunner().run(agent, "hello", memory=memory)
+
+        assert result.final_step is not None
+        assert result.final_step.text == "turns:1"
+        assert result.memory is not memory
+        assert len(result.memory) == 3
+        assert len(memory) == 1
+
+    def test_a_run_runtime_memory_is_not_mutated(self):
+        async def run_test():
+            memory = Memory()
+            memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+            agent = Agent(
+                name="memory_agent",
+                client=RuntimeMemoryMockClient(),
+                system_prompt="You are a test agent",
+            )
+
+            result = await agent.a_run("hello", memory=memory)
+
+            assert result is not None
+            assert result.text == "turns:1"
+            assert len(memory) == 1
+
+        asyncio.run(run_test())
+
+    def test_stream_runtime_memory_is_not_mutated(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        results = list(agent.stream_invoke("hello", memory=memory))
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "turns:1"
+        assert len(memory) == 1
+
+    def test_a_stream_runtime_memory_is_not_mutated(self):
+        async def run_test():
+            memory = Memory()
+            memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+            agent = Agent(
+                name="memory_agent",
+                client=RuntimeMemoryMockClient(),
+                system_prompt="You are a test agent",
+            )
+
+            results = []
+            async for item in agent.a_stream_invoke("hello", memory=memory):
+                results.append(item)
+
+            assert isinstance(results[-1], StepResult)
+            assert results[-1].text == "turns:1"
+            assert len(memory) == 1
+
+        asyncio.run(run_test())

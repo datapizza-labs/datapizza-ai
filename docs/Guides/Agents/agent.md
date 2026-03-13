@@ -96,24 +96,21 @@ Supported values:
 - `"required_first"`: the first step must use a tool, later steps go back to `auto`
 - `list[str]`: restrict tool use to a named subset
 
-## Keep memory between runs
+## Add memory to your agent
 
 You can pass a custom `Memory` object.
+This is useful when you want to start one specific run from custom history without changing the agent's default memory.
 
 ```python
 from datapizza.memory import Memory
+from datapizza.type import ROLE, TextBlock
 
 memory = Memory()
+memory.add_turn(TextBlock(content="The user's name is Federico."), role=ROLE.USER)
 
-agent = Agent(
-    name="assistant",
-    system_prompt="You are a helpful assistant.",
-    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
-    stateless=False,
-    memory=memory,
-)
+result = agent.run("What is the user's name?", memory=memory)
+print(result.text)
 ```
-
 ## Stream responses
 
 Use `stream_invoke(...)` when you want to observe the run as it happens.

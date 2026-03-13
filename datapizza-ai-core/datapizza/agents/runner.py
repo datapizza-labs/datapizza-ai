@@ -55,12 +55,17 @@ class AgentRunner:
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> AgentRunnerResult:
         if not root_agent._stateless:
             with root_agent._lock:
-                return self._run(root_agent, task_input, tool_choice, **gen_kwargs)
-        return self._run(root_agent, task_input, tool_choice, **gen_kwargs)
+                return self._run(
+                    root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
+                )
+        return self._run(
+            root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
 
     async def a_run(
         self,
@@ -68,14 +73,17 @@ class AgentRunner:
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> AgentRunnerResult:
         if not root_agent._stateless:
             async with root_agent._async_lock:
                 return await self._a_run(
-                    root_agent, task_input, tool_choice, **gen_kwargs
+                    root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
                 )
-        return await self._a_run(root_agent, task_input, tool_choice, **gen_kwargs)
+        return await self._a_run(
+            root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
 
     def stream(
         self,
@@ -83,15 +91,18 @@ class AgentRunner:
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> "Generator[ClientResponse | StepResult | Plan | None, None, None]":
         if not root_agent._stateless:
             with root_agent._lock:
                 yield from self._stream(
-                    root_agent, task_input, tool_choice, **gen_kwargs
+                    root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
                 )
                 return
-        yield from self._stream(root_agent, task_input, tool_choice, **gen_kwargs)
+        yield from self._stream(
+            root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
+        )
 
     async def a_stream(
         self,
@@ -99,17 +110,18 @@ class AgentRunner:
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"]
         | list[str] = "auto",
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> "AsyncGenerator[ClientResponse | StepResult | Plan | None]":
         if not root_agent._stateless:
             async with root_agent._async_lock:
                 async for item in self._a_stream(
-                    root_agent, task_input, tool_choice, **gen_kwargs
+                    root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
                 ):
                     yield item
                 return
         async for item in self._a_stream(
-            root_agent, task_input, tool_choice, **gen_kwargs
+            root_agent, task_input, tool_choice, memory=memory, **gen_kwargs
         ):
             yield item
 
@@ -118,11 +130,12 @@ class AgentRunner:
         root_agent: "Agent",
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"] | list[str],
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> AgentRunnerResult:
         from .agent import StepResult
 
-        shared_memory = self._initial_memory(root_agent)
+        shared_memory = self._initial_memory(root_agent, memory)
         current_agent = root_agent
         current_input = task_input
         handoff_count = 0
@@ -157,7 +170,7 @@ class AgentRunner:
         if final_step:
             final_step.usage = total_usage
 
-        if not root_agent._stateless:
+        if self._should_sync_memory(root_agent, memory):
             root_agent._memory = shared_memory
 
         return AgentRunnerResult(
@@ -174,9 +187,10 @@ class AgentRunner:
         root_agent: "Agent",
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"] | list[str],
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> "Generator[ClientResponse | StepResult | Plan | None, None, None]":
-        shared_memory = self._initial_memory(root_agent)
+        shared_memory = self._initial_memory(root_agent, memory)
         current_agent = root_agent
         current_input = task_input
         handoff_count = 0
@@ -206,7 +220,7 @@ class AgentRunner:
             current_agent = self._resolve_handoff(current_agent, handoff)
             current_input = handoff.task_input
 
-        if not root_agent._stateless:
+        if self._should_sync_memory(root_agent, memory):
             root_agent._memory = shared_memory
 
     async def _a_stream(
@@ -214,9 +228,10 @@ class AgentRunner:
         root_agent: "Agent",
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"] | list[str],
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> "AsyncGenerator[ClientResponse | StepResult | Plan | None]":
-        shared_memory = self._initial_memory(root_agent)
+        shared_memory = self._initial_memory(root_agent, memory)
         current_agent = root_agent
         current_input = task_input
         handoff_count = 0
@@ -246,7 +261,7 @@ class AgentRunner:
             current_agent = self._resolve_handoff(current_agent, handoff)
             current_input = handoff.task_input
 
-        if not root_agent._stateless:
+        if self._should_sync_memory(root_agent, memory):
             root_agent._memory = shared_memory
 
     async def _a_run(
@@ -254,11 +269,12 @@ class AgentRunner:
         root_agent: "Agent",
         task_input: str,
         tool_choice: Literal["auto", "required", "none", "required_first"] | list[str],
+        memory: Memory | None = None,
         **gen_kwargs,
     ) -> AgentRunnerResult:
         from .agent import StepResult
 
-        shared_memory = self._initial_memory(root_agent)
+        shared_memory = self._initial_memory(root_agent, memory)
         current_agent = root_agent
         current_input = task_input
         handoff_count = 0
@@ -293,7 +309,7 @@ class AgentRunner:
         if final_step:
             final_step.usage = total_usage
 
-        if not root_agent._stateless:
+        if self._should_sync_memory(root_agent, memory):
             root_agent._memory = shared_memory
 
         return AgentRunnerResult(
@@ -503,8 +519,12 @@ class AgentRunner:
         if final_answer:
             agent._logger.log_panel(final_answer, title="FINAL ANSWER")
 
-    def _initial_memory(self, agent: "Agent") -> Memory:
-        return agent._memory.copy()
+    def _initial_memory(self, agent: "Agent", memory: Memory | None) -> Memory:
+        source = memory if memory is not None else agent._memory
+        return source.copy()
+
+    def _should_sync_memory(self, agent: "Agent", memory: Memory | None) -> bool:
+        return not agent._stateless and memory is None
 
     def _run_single_agent(
         self,
