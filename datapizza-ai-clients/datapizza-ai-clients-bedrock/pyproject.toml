@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.7,<0.1.0",
+    "datapizza-ai-core>=0.1.0,<0.2.0",
     "boto3>=1.35.0",
     "botocore>=1.35.0",
     "aioboto3>=13.0.0",
