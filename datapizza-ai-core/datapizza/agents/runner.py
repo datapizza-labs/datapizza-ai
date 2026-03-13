@@ -179,8 +179,12 @@ class AgentRunner:
         shared_memory = self._initial_memory(root_agent)
         current_agent = root_agent
         current_input = task_input
+        handoff_count = 0
 
         while True:
+            if handoff_count > self.max_handoffs:
+                raise RuntimeError("Maximum handoffs exceeded")
+
             handoff: HandoffRequest | None = None
             with agent_span(f"Agent {current_agent.name}"):
                 for item in self._stream_single_agent(
@@ -198,6 +202,7 @@ class AgentRunner:
             if handoff is None:
                 break
 
+            handoff_count += 1
             current_agent = self._resolve_handoff(current_agent, handoff)
             current_input = handoff.task_input
 
@@ -214,8 +219,12 @@ class AgentRunner:
         shared_memory = self._initial_memory(root_agent)
         current_agent = root_agent
         current_input = task_input
+        handoff_count = 0
 
         while True:
+            if handoff_count > self.max_handoffs:
+                raise RuntimeError("Maximum handoffs exceeded")
+
             handoff: HandoffRequest | None = None
             with agent_span(f"Agent {current_agent.name}"):
                 async for item in self._a_stream_single_agent(
@@ -233,6 +242,7 @@ class AgentRunner:
             if handoff is None:
                 break
 
+            handoff_count += 1
             current_agent = self._resolve_handoff(current_agent, handoff)
             current_input = handoff.task_input
 
@@ -346,16 +356,19 @@ class AgentRunner:
                 agent._logger.log_panel(str(plan), title="PLAN")
 
             response = None
+            stream_usage = TokenUsage()
             for chunk in self._invoke_model_stream(
                 agent, original_task, memory, **kwargs
             ):
                 if isinstance(chunk, ClientResponse):
+                    stream_usage += chunk.usage
                     response = chunk
                     if chunk.delta:
                         yield chunk
 
             if response is None:
                 raise RuntimeError("No response from client")
+            response.usage = stream_usage
 
             step_result, handoff = self._finalize_step(
                 agent, current_steps, original_task, memory, response
@@ -442,16 +455,19 @@ class AgentRunner:
                 agent._logger.log_panel(str(plan), title="PLAN")
 
             response = None
+            stream_usage = TokenUsage()
             async for chunk in self._a_invoke_model_stream(
                 agent, original_task, memory, **kwargs
             ):
                 if isinstance(chunk, ClientResponse):
+                    stream_usage += chunk.usage
                     response = chunk
                     if chunk.delta:
                         yield chunk
 
             if response is None:
                 raise RuntimeError("No response from client")
+            response.usage = stream_usage
 
             step_result, handoff = await self._a_finalize_step(
                 agent, current_steps, original_task, memory, response
@@ -737,6 +753,7 @@ class AgentRunner:
                     "Please use a client with structured output support or remove output_cls."
                 ) from err
         elif agent._stream:
+            stream_usage = TokenUsage()
             for chunk in agent._client.stream_invoke(
                 input=task_input,
                 tools=tools,
@@ -744,7 +761,10 @@ class AgentRunner:
                 system_prompt=agent.system_prompt,
                 **kwargs,
             ):
+                stream_usage += chunk.usage
                 response = chunk
+            if response is not None:
+                response.usage = stream_usage
         else:
             response = agent._client.invoke(
                 input=task_input,
@@ -820,6 +840,7 @@ class AgentRunner:
                     "Please use a client with structured output support or remove output_cls."
                 ) from err
         elif agent._stream:
+            stream_usage = TokenUsage()
             async for chunk in agent._client.a_stream_invoke(
                 input=task_input,
                 tools=tools,
@@ -827,7 +848,10 @@ class AgentRunner:
                 system_prompt=agent.system_prompt,
                 **kwargs,
             ):
+                stream_usage += chunk.usage
                 response = chunk
+            if response is not None:
+                response.usage = stream_usage
         else:
             response = await agent._client.a_invoke(
                 input=task_input,

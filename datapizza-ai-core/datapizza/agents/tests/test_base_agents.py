@@ -1,4 +1,5 @@
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -14,6 +15,7 @@ from datapizza.agents.agent import (
 from datapizza.agents.runner import AgentRunner
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
+from datapizza.core.clients.models import TokenUsage
 from datapizza.tools import tool
 from datapizza.type import FunctionCallBlock, TextBlock
 
@@ -139,6 +141,37 @@ class TestBaseAgents:
 
         a_tool = agent.as_tool()
         assert a_tool.description == "empty_description_agent"
+
+    def test_as_tool_returns_text_by_default(self):
+        agent = Agent(
+            name="plain_text_agent",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        result = asyncio.run(a_tool("Hello"))
+        assert result == "Hello"
+
+    def test_as_tool_returns_structured_output_as_json(self):
+        class Person(BaseModel):
+            name: str
+            age: int
+
+        class AsyncStructuredMockClient(MockClient):
+            async def _a_structured_response(self, *args, **kwargs):
+                return self._structured_response(*args, **kwargs)
+
+        agent = Agent(
+            name="structured_agent",
+            client=AsyncStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        a_tool = agent.as_tool()
+        result = asyncio.run(a_tool('{"name":"Alice","age":30}'))
+        assert json.loads(result) == {"name": "Alice", "age": 30}
 
     def test_params_as_class_attributes(self):
         class TestAgent(Agent):
@@ -540,7 +573,111 @@ class HandoffMockClient(MockClient):
         return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
 
 
+class StreamingUsageMockClient(MockClient):
+    def _stream_invoke(
+        self,
+        input,
+        tools=None,
+        memory=None,
+        tool_choice="auto",
+        temperature=None,
+        max_tokens=None,
+        system_prompt=None,
+        **kwargs,
+    ):
+        yield ClientResponse(
+            content=[TextBlock(content="H")],
+            delta="H",
+            usage=TokenUsage(completion_tokens=1),
+        )
+        yield ClientResponse(
+            content=[TextBlock(content="He")],
+            delta="e",
+            usage=TokenUsage(completion_tokens=1),
+        )
+        yield ClientResponse(
+            content=[TextBlock(content="Hey")],
+            delta="y",
+            usage=TokenUsage(completion_tokens=1),
+        )
+
+    async def _a_stream_invoke(
+        self,
+        input,
+        tools=None,
+        memory=None,
+        tool_choice="auto",
+        temperature=None,
+        max_tokens=None,
+        system_prompt=None,
+        **kwargs,
+    ):
+        for chunk in self._stream_invoke(
+            input,
+            tools=tools,
+            memory=memory,
+            tool_choice=tool_choice,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+            **kwargs,
+        ):
+            yield chunk
+
+
+class CyclingHandoffMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        if tools is None:
+            tools = []
+
+        input_text = ""
+        if isinstance(input, list):
+            for block in input:
+                if isinstance(block, TextBlock):
+                    input_text = block.content
+
+        if input_text in {"start", "to_a"}:
+            target = "b"
+            task_input = "to_b"
+        elif input_text == "to_b":
+            target = "a"
+            task_input = "to_a"
+        else:
+            return super()._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+        handoff_tool = next(
+            tool for tool in tools if tool.name == f"transfer_to_{target}"
+        )
+        return ClientResponse(
+            content=[
+                FunctionCallBlock(
+                    id=f"handoff-{target}",
+                    arguments={"task_input": task_input},
+                    name=handoff_tool.name,
+                    tool=handoff_tool,
+                )
+            ]
+        )
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
 class TestAgentRunner:
+    def test_streaming_run_aggregates_usage(self):
+        agent = Agent(
+            name="streaming",
+            client=StreamingUsageMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+        )
+
+        result = agent.run("Hello")
+
+        assert result is not None
+        assert result.text == "Hey"
+        assert result.usage.completion_tokens == 3
+
     def test_agent_run_preserves_stepresult_with_handoff(self):
         specialist = Agent(
             name="specialist",
@@ -644,3 +781,22 @@ class TestAgentRunner:
 
         assert isinstance(results[-1], StepResult)
         assert results[-1].text == "shared:3"
+
+    def test_runner_stream_enforces_max_handoffs(self):
+        agent_a = Agent(
+            name="a",
+            client=CyclingHandoffMockClient(),
+            system_prompt="You are agent a",
+        )
+        agent_b = Agent(
+            name="b",
+            client=CyclingHandoffMockClient(),
+            system_prompt="You are agent b",
+        )
+        agent_a.can_handoff(agent_b)
+        agent_b.can_handoff(agent_a)
+
+        runner = AgentRunner(max_handoffs=1)
+
+        with pytest.raises(RuntimeError, match="Maximum handoffs exceeded"):
+            list(runner.stream(agent_a, "start"))

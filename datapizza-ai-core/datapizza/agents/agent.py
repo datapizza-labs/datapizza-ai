@@ -204,7 +204,12 @@ class Agent:
     def _tool_from_agent(cls, agent: "Agent", end: bool = False):
         async def invoke_agent(input_task: str):
             result = await agent.a_run(input_task)
-            return cast(StepResult, result).text
+            step_result = cast(StepResult, result)
+            if step_result.structured_data:
+                return "\n".join(
+                    item.model_dump_json() for item in step_result.structured_data
+                )
+            return step_result.text
 
         tool_description = (
             getattr(agent, "description", None) or agent.__doc__ or agent.name
