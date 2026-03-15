@@ -43,6 +43,133 @@ def test_qdrant_vectorstore_add(vectorstore):
     assert len(res) == 1
 
 
+def test_create_collection_without_vector_name_and_query(vectorstore):
+    vectorstore.create_collection(
+        collection_name="unnamed_dense_test",
+        vector_config=[VectorConfig(dimensions=1536, name=None)],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello unnamed dense",
+                embeddings=[DenseEmbedding(name=None, vector=[0.0] * 1536)],
+            )
+        ],
+        collection_name="unnamed_dense_test",
+    )
+
+    results = vectorstore.search(
+        collection_name="unnamed_dense_test",
+        query_vector=[0.0] * 1536,
+    )
+    assert len(results) == 1
+
+
+def test_create_collection_with_vector_name_and_query_with_name(vectorstore):
+    vectorstore.create_collection(
+        collection_name="single_named_dense_test",
+        vector_config=[VectorConfig(dimensions=1536, name="single_dense")],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello single named dense",
+                embeddings=[DenseEmbedding(name="single_dense", vector=[0.0] * 1536)],
+            )
+        ],
+        collection_name="single_named_dense_test",
+    )
+
+    results = vectorstore.search(
+        collection_name="single_named_dense_test",
+        query_vector=[0.0] * 1536,
+        vector_name="single_dense",
+    )
+    assert len(results) == 1
+
+
+def test_query_single_named_vector_collection_without_vector_name(vectorstore):
+    vectorstore.create_collection(
+        collection_name="single_named_dense_no_name_query_test",
+        vector_config=[VectorConfig(dimensions=1536, name="single_dense")],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello implicit single named dense",
+                embeddings=[DenseEmbedding(name="single_dense", vector=[0.0] * 1536)],
+            )
+        ],
+        collection_name="single_named_dense_no_name_query_test",
+    )
+
+    results = vectorstore.search(
+        collection_name="single_named_dense_no_name_query_test",
+        query_vector=[0.0] * 1536,
+    )
+    assert len(results) == 1
+
+
+def test_query_multiple_dense_vectors_without_vector_name_raises(vectorstore):
+    vectorstore.create_collection(
+        collection_name="multiple_dense_no_name_query_test",
+        vector_config=[
+            VectorConfig(dimensions=1536, name="dense_emb_name_1"),
+            VectorConfig(dimensions=1536, name="dense_emb_name_2"),
+        ],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello multiple dense",
+                embeddings=[
+                    DenseEmbedding(name="dense_emb_name_1", vector=[0.0] * 1536),
+                    DenseEmbedding(name="dense_emb_name_2", vector=[0.0] * 1536),
+                ],
+            )
+        ],
+        collection_name="multiple_dense_no_name_query_test",
+    )
+
+    with pytest.raises(ValueError, match="Vector name not specified"):
+        vectorstore.search(
+            collection_name="multiple_dense_no_name_query_test",
+            query_vector=[0.0] * 1536,
+        )
+
+
+def test_create_sparse_only_collection_and_query(vectorstore):
+    vectorstore.create_collection(
+        collection_name="sparse_only_collection_test",
+        vector_config=[VectorConfig(name="sparse", format=EmbeddingFormat.SPARSE)],
+    )
+
+    vectorstore.add(
+        chunk=[
+            Chunk(
+                id=str(uuid.uuid4()),
+                text="Hello sparse only",
+                embeddings=[SparseEmbedding(name="sparse", values=[0.1], indices=[1])],
+            )
+        ],
+        collection_name="sparse_only_collection_test",
+    )
+
+    results = vectorstore.search(
+        collection_name="sparse_only_collection_test",
+        query_vector=SparseEmbedding(name="sparse", values=[0.1], indices=[1]),
+    )
+    assert len(results) == 1
+
+
 def test_qdrant_vectorstore_create_collection(vectorstore):
     vectorstore.create_collection(
         collection_name="test2",

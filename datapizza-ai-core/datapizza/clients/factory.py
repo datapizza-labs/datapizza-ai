@@ -1,5 +1,6 @@
 from enum import Enum
 
+from datapizza.clients.mock_client import MockClient
 from datapizza.core.clients.client import Client
 
 
@@ -7,10 +8,13 @@ class Provider(str, Enum):
     """Supported LLM providers"""
 
     OPENAI = "openai"
+    OPENAI_LIKE = "openai_like"
     GOOGLE = "google"
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"
     AZURE_OPENAI = "azure_openai"
+    WATSONX = "watsonx"
+    MOCK = "mock"
 
 
 class ClientFactory:
@@ -55,6 +59,22 @@ class ClientFactory:
                     ) from e
 
                 return OpenAIClient(
+                    api_key=api_key,
+                    model=model,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    **kwargs,
+                )
+
+            case Provider.OPENAI_LIKE:
+                try:
+                    from datapizza.clients.openai_like import OpenAILikeClient
+                except ImportError as e:
+                    raise ImportError(
+                        "OpenAIClient is not installed. Please install it with `pip install datapizza-ai-clients-openai-like"
+                    ) from e
+
+                return OpenAILikeClient(
                     api_key=api_key,
                     model=model,
                     system_prompt=system_prompt,
@@ -129,5 +149,25 @@ class ClientFactory:
                     temperature=temperature,
                     **kwargs,
                 )
+
+            case Provider.WATSONX:
+                try:
+                    from datapizza.clients.watsonx import (  # type: ignore
+                        WatsonXClient,
+                    )
+                except ImportError as e:
+                    raise ImportError(
+                        "IBM WatsonX client is not installed. Please install it with `pip install datapizza-ai-clients-watsonx`"
+                    ) from e
+
+                return WatsonXClient(
+                    api_key=api_key,
+                    model=model,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    **kwargs,
+                )
+            case Provider.MOCK:
+                return MockClient(model_name=model, system_prompt=system_prompt)
             case _:
                 raise ValueError(f"Unsupported provider: {provider}")

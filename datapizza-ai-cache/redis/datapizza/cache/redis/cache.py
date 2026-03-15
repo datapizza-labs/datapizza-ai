@@ -1,9 +1,10 @@
 import logging
-import pickle
 
 from datapizza.core.cache import Cache
 
 import redis
+
+from .json_codec import decode_cache_value, encode_cache_value
 
 log = logging.getLogger(__name__)
 
@@ -19,14 +20,19 @@ class RedisCache(Cache):
         self.redis = redis.Redis(host=host, port=port, db=db)
         self.expiration_time = expiration_time
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> object | None:
         """Retrieve and deserialize object"""
-        pickled_obj = self.redis.get(key)
-        if pickled_obj is None:
+        raw_value = self.redis.get(key)
+        if raw_value is None:
             return None
-        return pickle.loads(pickled_obj)  # type: ignore
 
-    def set(self, key: str, obj):
+        try:
+            return decode_cache_value(raw_value)
+        except Exception as exc:
+            log.warning("Invalid cache payload for key %s: %s", key, exc)
+            return None
+
+    def set(self, key: str, obj: object):
         """Serialize and store object"""
-        pickled_obj = pickle.dumps(obj)
-        self.redis.set(key, pickled_obj, ex=self.expiration_time)
+        serialized = encode_cache_value(obj)
+        self.redis.set(key, serialized, ex=self.expiration_time)

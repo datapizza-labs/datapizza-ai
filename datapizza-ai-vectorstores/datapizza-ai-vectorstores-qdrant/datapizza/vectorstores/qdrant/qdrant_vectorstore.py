@@ -125,7 +125,15 @@ class QdrantVectorstore(Vectorstore):
         vector = {}
         for v in chunk.embeddings:
             if isinstance(v, DenseEmbedding):
-                vector[v.name] = v.vector
+                if v.name is None:
+                    if len(chunk.embeddings) > 1:
+                        raise ValueError(
+                            "There is at least one unnamed vector, even though the chunk has more than one vector"
+                        )
+                    vector = v.vector
+                else:
+                    vector[v.name] = v.vector
+
             elif isinstance(v, SparseEmbedding):
                 vector[v.name] = models.SparseVector(values=v.values, indices=v.indices)
             else:
@@ -331,19 +339,36 @@ class QdrantVectorstore(Vectorstore):
         ) = None
         config = None
         try:
-            config = {
-                v.name: models.VectorParams(
-                    size=v.dimensions,  # type: ignore
-                    distance=v.distance.value,  # type: ignore
-                )
-                for v in vector_config
-                if v.format == EmbeddingFormat.DENSE
-            }
-            sparse_config = {
-                v.name: models.SparseVectorParams()
-                for v in vector_config
-                if v.format == EmbeddingFormat.SPARSE
-            }
+            if (
+                len(vector_config) == 1
+                and vector_config[0].format == EmbeddingFormat.DENSE
+            ):
+                v = vector_config[0]
+                if v.name is None:
+                    config = models.VectorParams(
+                        size=v.dimensions,  # type: ignore
+                        distance=v.distance.value,  # type: ignore
+                    )
+                else:
+                    config = {
+                        v.name: models.VectorParams(
+                            size=v.dimensions, distance=v.distance.value
+                        )
+                    }
+            else:
+                config = {
+                    v.name: models.VectorParams(
+                        size=v.dimensions,  # type: ignore
+                        distance=v.distance.value,  # type: ignore
+                    )
+                    for v in vector_config
+                    if v.format == EmbeddingFormat.DENSE
+                }
+                sparse_config = {
+                    v.name: models.SparseVectorParams()
+                    for v in vector_config
+                    if v.format == EmbeddingFormat.SPARSE
+                }
 
             client.create_collection(
                 collection_name=collection_name,

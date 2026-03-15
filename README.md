@@ -322,7 +322,7 @@ print(f"Generated response: {result['generator']}")
 
 - 📖 **[Complete Documentation](https://docs.datapizza.ai)** - Comprehensive guides and API reference
 - 🎯 **[RAG Tutorial](https://docs.datapizza.ai/latest/Guides/RAG/rag/)** - Build production RAG systems
-- 🤖 **[Agent Examples](https://docs.datapizza.ai/latest/Guides/agent/)** - Real-world agent implementations
+- 🤖 **[Agent Examples](https://docs.datapizza.ai/latest/Guides/Agents/agent/)** - Real-world agent implementations
 
 ## 🤝 Community
 

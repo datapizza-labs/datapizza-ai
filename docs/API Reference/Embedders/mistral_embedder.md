@@ -59,7 +59,7 @@ Set the batch size to a conservative value (eg: 150) to avoid the error `Too man
                                 model_name="mistral-embed",
                             ),
                             batch_size=150  # Mistral API limit (conservative)
-                        ),  
+                        ),
                     ],
                 )
 ```

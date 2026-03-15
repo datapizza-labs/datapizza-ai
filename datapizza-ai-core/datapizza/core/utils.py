@@ -149,7 +149,23 @@ def extract_media(coordinates, file_path, page_number):
 
 
 # Helper function to replace environment variables
-def replace_env_vars(value, constants: dict[str, str] | None = None) -> Any:
+def replace_env_vars(
+    value,
+    constants: dict[str, str] | None = None,
+    skip_unknown: bool = False,
+) -> Any:
+    """Replace ${VAR_NAME} placeholders with values from constants or environment variables.
+
+    Args:
+        value: The value to process (can be string, dict, list, or any other type)
+        constants: Dictionary mapping variable names to their values
+        skip_unknown: If True, leave unknown ${VAR_NAME} placeholders untouched instead of
+                      raising an error. Useful when other placeholder types (like elements)
+                      will be processed later.
+
+    Returns:
+        The value with placeholders replaced
+    """
     if not constants:
         constants = {}
 
@@ -160,12 +176,18 @@ def replace_env_vars(value, constants: dict[str, str] | None = None) -> Any:
             return constants[var_name]
 
         env_value = os.environ.get(var_name)
-        if not env_value:
-            raise ValueError(f"Environment variable {var_name} not found or empty")
-        return env_value
+        if env_value:
+            return env_value
+
+        if skip_unknown:
+            return value  # Leave the placeholder as-is for later processing
+
+        raise ValueError(f"Environment variable {var_name} not found or empty")
     elif isinstance(value, dict):
-        return {k: replace_env_vars(v, constants) for k, v in value.items()}
+        return {
+            k: replace_env_vars(v, constants, skip_unknown) for k, v in value.items()
+        }
     elif isinstance(value, list):
-        return [replace_env_vars(item, constants) for item in value]
+        return [replace_env_vars(item, constants, skip_unknown) for item in value]
     else:
         return value

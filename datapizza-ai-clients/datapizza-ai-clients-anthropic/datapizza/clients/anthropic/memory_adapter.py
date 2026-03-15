@@ -1,5 +1,6 @@
 import base64
 import json
+from typing import Any
 
 from datapizza.memory.memory import Turn
 from datapizza.memory.memory_adapter import MemoryAdapter
@@ -16,6 +17,18 @@ from datapizza.type import (
 class AnthropicMemoryAdapter(MemoryAdapter):
     """Adapter for converting Memory objects to Anthropic API message format"""
 
+    @staticmethod
+    def _normalize_tool_result_content(result: Any) -> str | list[dict[str, Any]]:
+        if result is None:
+            return ""
+        if isinstance(result, str):
+            return result
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            return json.dumps(result)
+        return str(result)
+
     def _turn_to_message(self, turn: Turn) -> dict:
         content = []
         for block in turn:
@@ -25,23 +38,19 @@ class AnthropicMemoryAdapter(MemoryAdapter):
                 case TextBlock():
                     block_dict = {"type": "text", "text": block.content}
                 case FunctionCallBlock():
-                    block_dict = json.dumps(
-                        {
-                            "type": "tool_call",
-                            "id": block.id,
-                            "tool_name": block.name,
-                            "tool_args": block.arguments,
-                        }
-                    )
+                    block_dict = {
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.arguments,
+                    }
 
                 case FunctionCallResultBlock():
-                    block_dict = json.dumps(
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": block.result,
-                        }
-                    )
+                    block_dict = {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": self._normalize_tool_result_content(block.result),
+                    }
                 case StructuredBlock():
                     block_dict = {
                         "type": "text",
@@ -65,9 +74,6 @@ class AnthropicMemoryAdapter(MemoryAdapter):
             list(block.keys()) == ["type", "text"] for block in content
         ):
             content = "".join([block["text"] for block in content])
-
-        if len(content) == 1:
-            content = content[0]
 
         return {
             "role": turn.role.anthropic_role,

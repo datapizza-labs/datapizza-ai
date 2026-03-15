@@ -142,6 +142,7 @@ class Client(ChainableProducer):
                 "completion_tokens_used", response.completion_tokens_used
             )
             span.set_attribute("cached_tokens_used", response.cached_tokens_used)
+            span.set_attribute("thinking_tokens_used", response.thinking_tokens_used)
             span.set_attribute("model_name", self.model_name)
             if os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true":
                 span.set_attribute(
@@ -215,6 +216,7 @@ class Client(ChainableProducer):
                 "completion_tokens_used", response.completion_tokens_used
             )
             span.set_attribute("cached_tokens_used", response.cached_tokens_used)
+            span.set_attribute("thinking_tokens_used", response.thinking_tokens_used)
             span.set_attribute("model_name", self.model_name)
             span.set_attribute("stop_reason", response.stop_reason or "None")
 
@@ -288,6 +290,9 @@ class Client(ChainableProducer):
                 )
                 span.set_attribute(
                     "cached_tokens_used", last_response.cached_tokens_used
+                )
+                span.set_attribute(
+                    "thinking_tokens_used", last_response.thinking_tokens_used
                 )
                 span.set_attribute("model_name", self.model_name)
                 span.set_attribute("stop_reason", last_response.stop_reason or "None")
@@ -377,6 +382,9 @@ class Client(ChainableProducer):
                 span.set_attribute(
                     "cached_tokens_used", last_response.cached_tokens_used
                 )
+                span.set_attribute(
+                    "thinking_tokens_used", last_response.thinking_tokens_used
+                )
                 span.set_attribute("model_name", self.model_name)
                 span.set_attribute("stop_reason", last_response.stop_reason or "None")
 
@@ -451,6 +459,7 @@ class Client(ChainableProducer):
                 "completion_tokens_used", response.completion_tokens_used
             )
             span.set_attribute("cached_tokens_used", response.cached_tokens_used)
+            span.set_attribute("thinking_tokens_used", response.thinking_tokens_used)
             span.set_attribute("model_name", self.model_name)
             span.set_attribute("stop_reason", response.stop_reason or "None")
             if os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true":
@@ -527,6 +536,7 @@ class Client(ChainableProducer):
                 "completion_tokens_used", response.completion_tokens_used
             )
             span.set_attribute("cached_tokens_used", response.cached_tokens_used)
+            span.set_attribute("thinking_tokens_used", response.thinking_tokens_used)
             span.set_attribute("model_name", self.model_name)
             span.set_attribute("stop_reason", response.stop_reason or "None")
             if os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true":

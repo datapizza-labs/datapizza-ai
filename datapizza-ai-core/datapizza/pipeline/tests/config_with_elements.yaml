@@ -1,0 +1,43 @@
+constants:
+  PROMPT_TABLE: "You are a helpful assistant that captions tables."
+  PROMPT_FIGURE: "You are a helpful assistant that captions figures."
+
+elements:
+  my_text_splitter:
+    type: TextSplitter
+    module: datapizza.modules.splitters
+    params:
+      max_char: 2000
+  my_node_splitter:
+    type: NodeSplitter
+    module: datapizza.modules.splitters
+    params:
+      max_char: 3000
+
+ingestion_pipeline:
+  clients:
+    mock_client:
+      provider: mock
+      model: "mock-model"
+    mock_embedder:
+      provider: mock
+      model: "mock-embedder"
+
+  modules:
+    - name: parser
+      type: TextParser
+      module: datapizza.modules.parsers
+    - name: splitter_from_element
+      type: SplitterWrapper
+      module: datapizza.pipeline.tests.test_pipeline
+      params:
+        splitter: "${my_text_splitter}"
+    - name: captioner
+      type: LLMCaptioner
+      module: datapizza.modules.captioners
+      params:
+        client: mock_client
+        system_prompt_table: "${PROMPT_TABLE}"
+        system_prompt_figure: "${PROMPT_FIGURE}"
+
+  collection_name: "test_elements"

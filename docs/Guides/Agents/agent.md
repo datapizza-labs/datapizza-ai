@@ -1,269 +1,393 @@
 # Build your first agent
 
-The `Agent` class is the core component for creating autonomous AI agents in Datapizza AI. It handles task execution, tool management, memory, and planning.
+Agents are the core building block in Datapizza AI.
 
-## Basic Usage
+An `Agent` combines:
+
+- a `name`
+- a `system_prompt`
+- a `client`
+- optional tools, memory, hooks, structured output, and handoffs
+
+Use this page to get an agent running quickly, then add the capabilities you need.
+
+## Create your first agent
+
+Start with the smallest useful setup.
 
 ```python
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
-from datapizza.memory import Memory
-from datapizza.tools import tool
 
 agent = Agent(
-    name="my_agent",
-    system_prompt="You are a helpful assistant",
+    name="assistant",
+    system_prompt="You are a helpful assistant.",
     client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
-    # tools=[],
-    # max_steps=10,
-    # terminate_on_text=True,  # Terminate execution when the client return a plain text
-    # memory=memory,
-    # stream=False,
-    # planning_interval=0
 )
-
-res = agent.run("Hi")
-print(res.text)
 ```
 
+The only required pieces are:
 
-## Use Tools
+- `name`: a human-readable name for the agent
+- `system_prompt`: the instructions the model follows
+- `client`: the model provider implementation
 
-The above agent is quite basic, so let's make it more functional by adding [**tools**](../../API%20Reference/Type/tool.md).
+## Run your first agent
+
+Call `run(...)` and read the final answer from `result.text`.
+
+```python
+result = agent.run("Write a one-line welcome message for a new user.")
+print(result.text)
+```
+
+`run(...)` returns a `StepResult`, not a plain string.
+
+The most useful properties are:
+
+- `result.text`: the final text answer
+- `result.tools_used`: tools called in that step
+- `result.structured_data`: parsed structured output when `output_cls` is set
+- `result.usage`: token usage aggregated for the run
+
+## Give your agent tools
+
+Tools let the agent fetch data or perform actions.
 
 ```python
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
-from datapizza.memory import Memory
 from datapizza.tools import tool
+
 
 @tool
 def get_weather(location: str, when: str) -> str:
-    """Retrieves weather information for a specified location and time."""
-    return "25 °C"
+    """Return weather information for a location and time."""
+    return "25 C"
 
-agent = Agent(name="weather_agent", tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
-response = agent.run("What's the weather tomorrow in Milan?")
 
-print(response.text)
-# Output:
-# Tomorrow in Milan, the temperature will be 25 °C.
+agent = Agent(
+    name="weather_agent",
+    system_prompt="You help users with weather questions.",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+    tools=[get_weather],
+)
+
+result = agent.run("What's the weather tomorrow in Milan?")
+print(result.text)
 ```
 
+### Control tool use
 
-### tool_choice
-
-You can set the parameter `tool_choice` at invoke time.
-
-The accepted values are: `auto`, `required`, `none`, `required_first`, `list["tool_name"]`
-
+At run time, you can control how the model uses tools with `tool_choice`.
 
 ```python
-res = master_agent.run(
-    task_input="what is the weather in milan?", tool_choice="required_first"
+result = agent.run(
+    "What's the weather in Milan?",
+    tool_choice="required_first",
 )
 ```
 
-- `auto`: the model will decide if use a tool or not.
-- `required_first`: force to use a tool only at the first step, then auto.
-- `required`: force to use a tool at every step.
-- `none`: force to not use any tool.
+Supported values:
 
+- `"auto"`: the model decides whether to use a tool
+- `"required"`: the model must use a tool every step
+- `"none"`: the model must not use tools
+- `"required_first"`: the first step must use a tool, later steps go back to `auto`
+- `list[str]`: restrict tool use to a named subset
 
+## Add memory to your agent
 
-## Core Methods
-
-
-### Sync run
-
-`run(task_input: str, tool_choice = "auto", **kwargs) -> str`
-Execute a task and return the final result.
+You can pass a custom `Memory` object.
+This is useful when you want to start one specific run from custom history without changing the agent's default memory.
 
 ```python
-result = agent.run("What's the weather like today?")
-print(result.text)  # "The weather is sunny with 25°C"
-```
-
-### Stream invoke
-Stream the agent's execution process, yielding intermediate steps. (Do not stream the single answer)
-
-```python
-from datapizza.agents.agent import Agent, StepResult
-from datapizza.clients.openai import OpenAIClient
 from datapizza.memory import Memory
-from datapizza.tools import tool
+from datapizza.type import ROLE, TextBlock
 
-@tool
-def get_weather(location: str, when: str) -> str:
-    """Retrieves weather information for a specified location and time."""
-    return "25 °C"
+memory = Memory()
+memory.add_turn(TextBlock(content="The user's name is Federico."), role=ROLE.USER)
 
-agent = Agent(name="weather_agent", tools=[get_weather], client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
+result = agent.run("What is the user's name?", memory=memory)
+print(result.text)
+```
+## Stream responses
 
-for step in agent.stream_invoke("What's the weather tomorrow in Milan?"):
-    print(f"Step {step.index} starting...")
-    print(step.text)
+Use `stream_invoke(...)` when you want to observe the run as it happens.
+
+It yields:
+
+- `ClientResponse` chunks when client streaming is enabled
+- `StepResult` objects for completed agent steps
+- `Plan` objects when planning is enabled
+
+```python
+from datapizza.agents import Agent, StepResult
+from datapizza.clients.openai import OpenAIClient
+from datapizza.core.clients import ClientResponse
+
+agent = Agent(
+    name="assistant",
+    system_prompt="You are a helpful assistant.",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+    stream=True,
+)
+
+for event in agent.stream_invoke("Tell me a short joke."):
+    if isinstance(event, ClientResponse):
+        print(event.delta, end="", flush=True)
+    elif isinstance(event, StepResult):
+        print("\nfinal step:", event.text)
 ```
 
-### Async run
-
-`a_run(task_input: str, **kwargs) -> str`
-Async version of run.
+Async streaming works the same way with `a_stream_invoke(...)`.
 
 ```python
 import asyncio
+
 
 async def main():
+    agent = Agent(
+        name="assistant",
+        system_prompt="You are a helpful assistant.",
+        client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+        stream=True,
+    )
 
-    agent = Agent(name="agent", client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"))
-    return await agent.a_run("Process this request")
+    async for event in agent.a_stream_invoke("Tell me a short joke."):
+        print(event)
 
 
-res = asyncio.run(main())
-print(res.text)
+asyncio.run(main())
 ```
 
-### Async stream invoke
-`a_stream_invoke(task_input: str, **kwargs) -> AsyncGenerator[str | StepResult, None]`
-Stream the agent's execution process, yielding intermediate steps. (Do not stream the single answer)
+## Return structured data
+
+If you want typed output instead of plain text, set `output_cls`.
 
 ```python
-from datapizza.agents.agent import Agent
+from pydantic import BaseModel
+from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
-import asyncio
 
-async def get_response():
-    client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini")
-    agent = Agent(name= "joke_agent",client=client)
-    async for step in agent.a_stream_invoke("tell me a joke"):
-        print(f"Step {step.index} starting...")
-        print(step.text)
 
-asyncio.run(get_response())
+class Person(BaseModel):
+    name: str
+    age: int
+
+
+agent = Agent(
+    name="person_extractor",
+    system_prompt="Extract a person from the input.",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1-mini"),
+    output_cls=Person,
+)
+
+result = agent.run('{"name": "Alice", "age": 30}')
+person = result.structured_data[0]
+print(person.name)
 ```
 
+When `output_cls` is set:
 
-## Multi-Agent Communication
+- the agent asks the client for structured output on each model turn
+- the parsed objects are available in `result.structured_data`
+- `result.text` may be empty
 
-An agent can call another ones using `can_call` method
+If the selected client does not support structured output, Datapizza raises a clear `ValueError`.
 
+## Choose a multi-agent pattern
+
+Before adding more agents, decide who should own the final answer.
+
+- `can_call(...)` / `as_tool()`: one orchestrator stays in control and calls specialists as tools
+- `handoffs`: control transfers to another agent, which continues the run
+
+Use `can_call(...)` when you want a manager pattern.
+Use `handoffs` when you want a specialist to take over.
+
+### Agents as tools
+
+In this pattern, the main agent keeps control of the conversation.
 
 ```python
-from datapizza.agents.agent import Agent
+from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
 from datapizza.tools import tool
 
 client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1")
 
+
 @tool
 def get_weather(city: str) -> str:
-    return f""" Monday's weather in {city} is cloudy.
-                Tuesday's weather in {city} is rainy.
-                Wednesday's weather in {city} is sunny
-                Thursday's weather in {city} is cloudy,
-                Friday's weather in {city} is rainy,
-                Saturday's weather in {city} is sunny
-                and Sunday's weather in {city} is cloudy."""
+    return f"The weather in {city} is sunny."
+
 
 weather_agent = Agent(
     name="weather_expert",
+    description="Answers weather questions.",
+    system_prompt="You are a weather expert.",
     client=client,
-    system_prompt="You are a weather expert. Provide detailed weather information and forecasts.",
-    tools=[get_weather]
+    tools=[get_weather],
 )
 
 planner_agent = Agent(
     name="planner",
+    system_prompt="You are a travel planner. Use specialist tools when useful.",
     client=client,
-    system_prompt="You are a trip planner. Use weather and analysis info to make recommendations."
 )
 
 planner_agent.can_call(weather_agent)
 
-response = planner_agent.run(
-    "I need to plan a hiking trip in Seattle next week. Can you help analyze the weather and make recommendations?"
-)
-print(response.text)
+result = planner_agent.run("Can I go hiking in Milan tomorrow?")
+print(result.text)
 ```
 
-Alternatively, you can define a tool that manually calls the agent.
-The two solutions are more or less identical.
+You can also convert an agent manually with `as_tool()`.
+
+```python
+tool = weather_agent.as_tool()
+```
+
+If delegating should end the orchestrator run immediately, use `end=True`.
+
+```python
+terminal_tool = weather_agent.as_tool(end=True)
+```
+
+When Datapizza builds a tool from an agent, the tool description is chosen in this order:
+
+1. `description` passed to `Agent(...)`
+2. the agent class docstring
+3. the agent name
+
+### Handoffs
+
+In this pattern, one agent transfers control to another.
 
 ```python
 from datapizza.agents import Agent
 from datapizza.clients.openai import OpenAIClient
-from datapizza.tools import tool
-
-class MasterAgent(Agent):
-    system_prompt="You are a master agent. You can call the weather expert to get weather information."
-    name="master_agent"
-
-    @tool
-    def call_weather_expert(self, task_to_ask: str) -> str:
-        @tool
-        def get_weather(city: str) -> str:
-            return f""" Monday's weather in {city} is cloudy.
-                        Tuesday's weather in {city} is rainy.
-                        Wednesday's weather in {city} is sunny
-                        Thursday's weather in {city} is cloudy,
-                        Friday's weather in {city} is rainy,
-                        Saturday's weather in {city} is sunny
-                        and Sunday's weather in {city} is cloudy."""
-
-        weather_agent = Agent(
-            name="weather_expert",
-            client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1"),
-            system_prompt="You are a weather expert. Provide detailed weather information and forecasts.",
-            tools=[get_weather]
-        )
-        res = weather_agent.run(task_to_ask)
-        return res.text
-
-master_agent = MasterAgent(
-    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1"),
-)
-
-master_agent.run("What is the weather in Rome?")
-```
-
-
-
-## Planning System
-
-When `planning_interval > 0`, the agent creates execution plans at regular intervals:
-
-During the planning stages, the agent spends time thinking about what the next steps are to be taken to achieve the task.
-
-```python
-agent = Agent(
-    name="Agent_with_plan",
-    client=client,
-    planning_interval=3,  # Plan every 3 steps
-)
-```
-
-The planning system generates structured plans that help the agent organize complex tasks.
-
-
-## Stream output response
-
-```python
-from datapizza.agents import Agent
-from datapizza.clients.openai import OpenAIClient
-from datapizza.core.clients import ClientResponse
-from datapizza.tools import tool
 
 client = OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1")
 
-agent = Agent(
-    name="Big_boss",
+refund_agent = Agent(
+    name="refund_specialist",
+    system_prompt="Handle refund requests clearly and safely.",
     client=client,
-    system_prompt="You are a helpful assistant that answers questions based on the provided context.",
-    stream=True, # With stream=True, the agent will stream the client resposne, not only the intermediate steps
-
 )
 
-for r in agent.stream_invoke("What is the weather in Milan?"):
-    if isinstance(r, ClientResponse):
-        print(r.delta, end="", flush=True)
+triage_agent = Agent(
+    name="triage",
+    system_prompt="Route the user to the right specialist.",
+    client=client,
+    handoffs=[refund_agent],
+)
+
+result = triage_agent.run("I was charged twice. I need a refund.")
+print(result.text)
 ```
+
+You can also register handoffs later:
+
+```python
+triage_agent.can_handoff(refund_agent)
+```
+
+For most users, `agent.run(...)` is enough. Datapizza creates an `AgentRunner` internally.
+
+If you need richer orchestration metadata, use `AgentRunner` directly.
+
+```python
+from datapizza.agents import AgentRunner
+
+runner = AgentRunner()
+result = runner.run(triage_agent, "I was charged twice.")
+
+print(result.final_step.text)
+print(result.final_agent.name)
+```
+
+`AgentRunner.run(...)` returns an `AgentRunnerResult` with these fields:
+
+- `final_step`: the final `StepResult`
+- `final_agent`: the agent that produced the final answer
+- `handoff_count`: how many handoffs happened during the run
+- `visited_agents`: the sequence of agents visited during the run
+- `memory`: the shared `Memory` used for the run
+- `usage`: aggregated `TokenUsage` for the whole run
+
+## Observe the agent loop
+
+Use hooks when you want to log or inspect each step.
+
+```python
+from datapizza.agents import Agent, AgentHooks, StepContext, StepResult
+from datapizza.clients.openai import OpenAIClient
+
+
+class DebugHooks(AgentHooks):
+    def before_step(self, context: StepContext) -> None:
+        print(f"starting step {context.step_index}")
+
+    def after_step(self, context: StepContext, result: StepResult) -> None:
+        print(f"finished step {context.step_index}: {result.text}")
+
+
+agent = Agent(
+    name="assistant",
+    system_prompt="You are a helpful assistant.",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+    hooks=DebugHooks(),
+)
+```
+
+`before_step(...)` runs at the start of each loop iteration.
+`after_step(...)` runs after the step result is produced.
+
+## Plan before acting
+
+If you want the agent to periodically create a plan before continuing, set `planning_interval`.
+
+```python
+agent = Agent(
+    name="planner_agent",
+    system_prompt="You solve tasks carefully.",
+    client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4.1"),
+    planning_interval=3,
+)
+```
+
+When planning is enabled, the agent generates a structured `Plan` at regular intervals and then continues execution.
+
+## Async run
+
+If your application is async, use `a_run(...)`.
+
+```python
+import asyncio
+from datapizza.agents import Agent
+from datapizza.clients.openai import OpenAIClient
+
+
+async def main():
+    agent = Agent(
+        name="assistant",
+        system_prompt="You are a helpful assistant.",
+        client=OpenAIClient(api_key="YOUR_API_KEY", model="gpt-4o-mini"),
+    )
+    result = await agent.a_run("Summarize this text in one sentence.")
+    print(result.text)
+
+
+asyncio.run(main())
+```
+
+## Next steps
+
+If you want to...
+
+- add capabilities to your agent, read the tools guide
+- build manager-style or handoff-based systems, read the multi-agent guides
+- stream events in more detail, use `stream_invoke(...)` / `a_stream_invoke(...)`
+- inspect orchestration metadata, use `AgentRunner`

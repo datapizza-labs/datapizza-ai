@@ -32,17 +32,20 @@ def get_token_usage(spans):
             prompt_tokens = span.attributes.get("prompt_tokens_used", 0)
             completion_tokens = span.attributes.get("completion_tokens_used", 0)
             cached_tokens = span.attributes.get("cached_tokens_used", 0)
+            thinking_tokens = span.attributes.get("thinking_tokens_used", 0)
 
             if model not in model_tokens:
                 model_tokens[model] = {
                     "prompt_tokens": 0,
                     "completion_tokens": 0,
                     "cached_tokens": 0,
+                    "thinking_tokens": 0,
                 }
 
             model_tokens[model]["prompt_tokens"] += prompt_tokens
             model_tokens[model]["completion_tokens"] += completion_tokens
             model_tokens[model]["cached_tokens"] += cached_tokens
+            model_tokens[model]["thinking_tokens"] += thinking_tokens
     return model_tokens
 
 
@@ -104,6 +107,7 @@ class ContextTracing:
                     table.add_column("Prompt Tokens")
                     table.add_column("Completion Tokens")
                     table.add_column("Cached Tokens")
+                    table.add_column("Thinking Tokens")
 
                     for model, usage in token_usage.items():
                         table.add_row(
@@ -111,6 +115,7 @@ class ContextTracing:
                             str(usage["prompt_tokens"]),
                             str(usage["completion_tokens"]),
                             str(usage["cached_tokens"]),
+                            str(usage["thinking_tokens"]),
                         )
 
                     panel = Panel(

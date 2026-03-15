@@ -19,8 +19,11 @@ from datapizza.vectorstores.qdrant import QdrantVectorstore
 vectorstore = QdrantVectorstore(
     host="localhost",
     port=6333,
-    api_key="your-api-key"  # Optional
+    api_key="your-api-key",  # Optional
+    https=False,  # Required for local non-TLS Qdrant when using api_key
 )
+
+> Warning: if you connect to local Qdrant (e.g. `127.0.0.1:6333`) with `api_key`, set `https=False` to avoid SSL errors like `[SSL] record layer failure`.
 
 # Or use in-memory/file storage
 vectorstore = QdrantVectorstore(

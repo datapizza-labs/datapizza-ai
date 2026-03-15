@@ -1,3 +1,4 @@
+import base64
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
@@ -8,6 +9,8 @@ from datapizza.memory import Memory
 from datapizza.tools import Tool
 from datapizza.type import (
     FunctionCallBlock,
+    Media,
+    MediaBlock,
     Model,
     StructuredBlock,
     TextBlock,
@@ -93,12 +96,56 @@ class GoogleClient(Client):
                 f"Failed to initialize Google GenAI client: {e!s}"
             ) from None
 
+    def _sanitize_schema(self, schema: Any) -> Any:
+        """Remove JSON Schema keys unsupported by Gemini's function schema."""
+        if isinstance(schema, dict):
+            sanitized = {}
+            for key, value in schema.items():
+                if key in [
+                    "additionalProperties",
+                    "additional_properties",
+                    "minLength",
+                    "maxLength",
+                    "pattern",
+                    "format",
+                    "minItems",
+                    "maxItems",
+                    "uniqueItems",
+                ]:
+                    continue
+                if key == "exclusiveMinimum":
+                    # For integers: exclusiveMinimum: 0 → minimum: 1 (next valid int)
+                    # For floats: just use the value (slight relaxation, allows boundary)
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["minimum"] = int(value) + 1
+                    else:
+                        sanitized["minimum"] = value
+                    continue
+                if key == "exclusiveMaximum":
+                    # Same logic for maximum
+                    if isinstance(value, int) or (
+                        isinstance(value, float) and value.is_integer()
+                    ):
+                        sanitized["maximum"] = int(value) - 1
+                    else:
+                        sanitized["maximum"] = value
+                    continue
+
+                sanitized[key] = self._sanitize_schema(value)
+            return sanitized
+        if isinstance(schema, list):
+            return [self._sanitize_schema(item) for item in schema]
+        return schema
+
     def _convert_tool(self, tool: Tool) -> dict:
         """Convert tools to Google function format"""
+        parameters_schema = self._sanitize_schema(tool.schema["parameters"])
         parameters = {
-            "type": tool.schema["parameters"]["type"],
-            "properties": tool.schema["parameters"]["properties"],
-            "required": tool.schema["parameters"]["required"],
+            "type": parameters_schema.get("type"),
+            "properties": parameters_schema.get("properties", {}),
+            "required": parameters_schema.get("required", []),
         }
 
         return {
@@ -140,8 +187,13 @@ class GoogleClient(Client):
 
         return TokenUsage(
             prompt_tokens=getattr(usage_metadata, "prompt_token_count", 0) or 0,
-            completion_tokens=getattr(usage_metadata, "candidates_token_count", 0) or 0,
+            completion_tokens=(
+                getattr(usage_metadata, "candidates_token_count", None)
+                or getattr(usage_metadata, "response_token_count", 0)
+                or 0
+            ),
             cached_tokens=getattr(usage_metadata, "cached_content_token_count", 0) or 0,
+            thinking_tokens=getattr(usage_metadata, "thoughts_token_count", 0) or 0,
         )
 
     def _convert_tool_choice(
@@ -274,6 +326,7 @@ class GoogleClient(Client):
         )
 
         message_text = ""
+        stop_reason = ""
         thought_block = ThoughtBlock(content="")
 
         usage = TokenUsage()
@@ -357,6 +410,7 @@ class GoogleClient(Client):
 
         usage = TokenUsage()
         message_text = ""
+        stop_reason = ""
         thought_block = ThoughtBlock(content="")
         async for chunk in await self.client.aio.models.generate_content_stream(
             model=self.model_name,
@@ -568,34 +622,54 @@ class GoogleClient(Client):
         self, response, tool_map: dict[str, Tool] | None = None
     ) -> ClientResponse:
         blocks = []
-        # Handle function calls if present
-        if hasattr(response, "function_calls") and response.function_calls:
-            for fc in response.function_calls:
-                if not tool_map:
-                    raise ValueError("Tool map is required")
 
-                tool = tool_map.get(fc.name, None)
-                if not tool:
-                    raise ValueError(f"Tool {fc.name} not found in tool map")
-
-                blocks.append(
-                    FunctionCallBlock(
-                        name=fc.name,
-                        arguments=fc.args,
-                        id=f"fc_{id(fc)}",
-                        tool=tool,
-                    )
-                )
-        else:
-            if hasattr(response, "text") and response.text:
-                blocks.append(TextBlock(content=response.text))
-
-        if hasattr(response, "candidates") and response.candidates:
+        # Check if response has candidates with parts
+        if (
+            hasattr(response, "candidates")
+            and response.candidates
+            and response.candidates[0].content
+            and response.candidates[0].content.parts
+        ):
             for part in response.candidates[0].content.parts:
-                if not part.text:
-                    continue
-                if hasattr(part, "thought") and part.thought:
+                # Handle function calls - extract thought_signature from part
+                if hasattr(part, "function_call") and part.function_call:
+                    fc = part.function_call
+                    if not tool_map:
+                        raise ValueError("Tool map is required")
+
+                    tool = tool_map.get(fc.name, None)
+                    if not tool:
+                        raise ValueError(f"Tool {fc.name} not found in tool map")
+
+                    # Extract thought_signature if present (required for Gemini 2.0+)
+                    thought_sig = None
+                    if hasattr(part, "thought_signature"):
+                        thought_sig = part.thought_signature
+
+                    blocks.append(
+                        FunctionCallBlock(
+                            name=fc.name,
+                            arguments=dict(fc.args) if fc.args else {},
+                            id=f"fc_{id(fc)}",
+                            tool=tool,
+                            thought_signature=thought_sig,
+                        )
+                    )
+                # Handle inline_data (images from generation or code execution)
+                elif hasattr(part, "inline_data") and part.inline_data is not None:
+                    media = Media(
+                        media_type="image",
+                        source_type="base64",
+                        source=base64.b64encode(part.inline_data.data).decode("utf-8"),
+                        extension=(part.inline_data.mime_type.split("/")[-1])
+                        if part.inline_data.mime_type
+                        else "png",
+                    )
+                    blocks.append(MediaBlock(media=media))
+                elif hasattr(part, "thought") and part.thought and part.text:
                     blocks.append(ThoughtBlock(content=part.text))
+                elif hasattr(part, "text") and part.text:
+                    blocks.append(TextBlock(content=part.text))
 
         usage_metadata = getattr(response, "usage_metadata", None)
         token_usage = self._token_usage_from_metadata(usage_metadata)

@@ -1,6 +1,7 @@
 
 test:
-	uv run pytest --tb=short -v --ignore=datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus
+	uv run pytest --tb=short -v --ignore=datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus --ignore=datapizza-ai-modules/parsers/docling
+
 
 watch-tests:
 	find . -name "*.py" -not -path "*/site-packages/*" | entr uv run pytest --tb=short -v

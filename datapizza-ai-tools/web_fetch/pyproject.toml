@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-tools-web-fetch"
-version = "0.0.2"
+version = "0.0.3"
 description = "A tool for fetching web content in the Datapizza AI framework."
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "datapizza-ai-core>=0.0.1,<0.1.0",
+    "datapizza-ai-core>=0.1.0,<0.2.0",
     "httpx>=0.28.1",
 ]
 

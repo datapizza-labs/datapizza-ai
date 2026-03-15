@@ -27,6 +27,9 @@ class GoogleMemoryAdapter(MemoryAdapter):
                     block_dict = {
                         "function_call": {"name": block.name, "args": block.arguments}
                     }
+                    # Include thought_signature if present (required for Gemini 2.0+)
+                    if block.thought_signature is not None:
+                        block_dict["thought_signature"] = block.thought_signature
                 case FunctionCallResultBlock():
                     block_dict = types.Part.from_function_response(
                         name=block.tool.name,
@@ -102,6 +105,11 @@ class GoogleMemoryAdapter(MemoryAdapter):
                         "data": pdf_bytes,
                     }
                 }
+            case "url":
+                return types.Part.from_uri(
+                    file_uri=block.media.source,
+                    mime_type="application/pdf",
+                )
 
             case _:
                 raise NotImplementedError(

@@ -1,23 +1,22 @@
 modules:
-  - name: openai_client
-    module: datapizza.clients.openai
-    type: OpenAIClient
+  - name: mock_client
+    module: datapizza.clients.mock_client
+    type: MockClient
     params:
-      api_key: api_key
-      model: gpt-4o
+      model_name: mock-model
 
-  - name: openai_client_2
-    module: datapizza.clients.openai
-    type: OpenAIClient
+  - name: mock_client_2
+    module: datapizza.clients.mock_client
+    type: MockClient
     params:
-      api_key: api_key
+      model_name: mock-model-2
       system_prompt: You are a helpful assistant that should answers my quesiont like if you are me. All context provided is from my knowledge base. If you don't know the answer, just say you don't know.
 
   - name: rewriter
     module: datapizza.modules.rewriters
     type: ToolRewriter
     params:
-      client: "{openai_client}"
+      client: "{mock_client}"
       system_prompt: You should use the tool to get the most relevant chunks from the vector store.
 
 pipeline:

@@ -1,12 +1,12 @@
 from abc import abstractmethod
+from typing import Generic, TypeVar
 
 from datapizza.core.models import PipelineComponent
-from datapizza.type import SparseEmbedding
-from typing import TypeVar, Generic
 
-T = TypeVar('T')
+T = TypeVar("T")
 
-class BaseEmbedder(PipelineComponent,Generic[T]):
+
+class BaseEmbedder(PipelineComponent, Generic[T]):
     client: object
     a_client: object
 

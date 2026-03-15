@@ -84,6 +84,13 @@ constants:
   EMBEDDING_MODEL: "text-embedding-3-small"
   CHUNK_SIZE: 1000
 
+elements:
+  my_custom_splitter:
+    type: TextSplitter
+    module: datapizza.modules.splitters
+    params:
+      max_char: 1500
+
 ingestion_pipeline:
   clients:
     openai_embedder:
@@ -105,6 +112,11 @@ ingestion_pipeline:
       module: datapizza.embedders
       params:
         client: openai_embedder
+    - name: custom_processor
+      type: MyCustomProcessor
+      module: my_project.processors
+      params:
+        splitter: "${my_custom_splitter}"
 
   vector_store:
     type: QdrantVectorstore
@@ -118,8 +130,10 @@ ingestion_pipeline:
 
 **Key points for YAML configuration:**
 
+-   **Constants**: Define string values under `constants` that can be referenced using `${CONST_NAME}` syntax.
 -   **Environment Variables**: Use `${VAR_NAME}` syntax within strings to securely load secrets or configuration from environment variables. Ensure these variables are set in your execution environment.
--   **Clients**: Define shared clients (like `OpenAIClient`) under the `clients` key and reference them by name within module `params`.
+-   **Elements**: Define reusable component instances under `elements`. Each element requires `type` (class name) and `module` (Python path). Optional `params` are passed to the constructor. Reference them in module `params` using `"${element_name}"` syntax. Unlike constants (simple string substitution), elements are fully instantiated Python objects.
+-  ~~**Clients**~~  (Obsoleted, use Elements instead): Define shared clients (like `OpenAIClient`) under the `clients` key and reference them by name within module `params`. Clients are specifically for LLM/API clients created via `ClientFactory`.
 -   **Modules**: List components under `modules`. Each requires `type` (class name) and `module` (Python path to the class). `params` are passed to the component's constructor (`__init__`). Components should generally inherit from `PipelineComponent`.
 -   **Vector Store**: Configure the optional vector store similarly to modules.
 -   **Collection Name**: Must be provided if a `vector_store` is configured.

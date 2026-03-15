@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai"
-version = "0.0.9"
+version = "0.1.0"
 description = "Build reliable Gen AI solutions without overhead"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "datapizza-ai-core>=0.0.1",
+    "datapizza-ai-core>=0.1.0,<0.2.0",
     "datapizza-ai-clients-openai>=0.0.1",
     "datapizza-ai-embedders-openai>=0.0.1",
     "datapizza-ai-vectorstores-qdrant>=0.0.1",
