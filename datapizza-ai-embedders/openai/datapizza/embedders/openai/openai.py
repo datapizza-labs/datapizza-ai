@@ -8,10 +8,12 @@ class OpenAIEmbedder(BaseEmbedder):
         api_key: str,
         model_name: str | None = None,
         base_url: str | None = None,
+        encoding_format: str | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
         self.model_name = model_name
+        self.encoding_format = encoding_format
 
         self.client = None
         self.a_client = None
@@ -41,7 +43,10 @@ class OpenAIEmbedder(BaseEmbedder):
 
         client = self._get_client()
 
-        response = client.embeddings.create(input=texts, model=model)
+        kwargs: dict = {"input": texts, "model": model}
+        if self.encoding_format is not None:
+            kwargs["encoding_format"] = self.encoding_format
+        response = client.embeddings.create(**kwargs)
 
         embeddings = [embedding.embedding for embedding in response.data]
         return embeddings[0] if isinstance(text, str) else embeddings
@@ -56,7 +61,10 @@ class OpenAIEmbedder(BaseEmbedder):
         texts = [text] if isinstance(text, str) else text
 
         client = self._get_a_client()
-        response = await client.embeddings.create(input=texts, model=model)
+        kwargs: dict = {"input": texts, "model": model}
+        if self.encoding_format is not None:
+            kwargs["encoding_format"] = self.encoding_format
+        response = await client.embeddings.create(**kwargs)
 
         embeddings = [embedding.embedding for embedding in response.data]
         return embeddings[0] if isinstance(text, str) else embeddings
