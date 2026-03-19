@@ -57,7 +57,12 @@ class OpenAIMemoryAdapter(MemoryAdapter):
                     }
 
                 case StructuredBlock():
-                    block_dict = {"type": "text", "text": str(block.content)}
+                    block_dict = {
+                        "type": "input_text"
+                        if turn.role == ROLE.USER
+                        else "output_text",
+                        "text": str(block.content),
+                    }
                 case MediaBlock():
                     match block.media.media_type:
                         case "image":
