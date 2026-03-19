@@ -8,6 +8,7 @@ from datapizza.type import (
     StructuredBlock,
     TextBlock,
     ThoughtBlock,
+    Model
 )
 
 
@@ -127,7 +128,7 @@ class ClientResponse:
         return [item for item in self.content if isinstance(item, FunctionCallBlock)]
 
     @property
-    def structured_data(self) -> list[BaseModel]:
+    def structured_data(self) -> list[Model]:
         """Returns all structured data in order"""
         return [
             item.content for item in self.content if isinstance(item, StructuredBlock)
