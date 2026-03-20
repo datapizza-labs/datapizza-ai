@@ -1,20 +1,16 @@
 from datapizza.tools import Tool, tool
 
-from toolbox_core import ToolboxClient, ToolboxSyncClient
+from toolbox_core import ToolboxSyncClient
 from toolbox_core.sync_tool import ToolboxSyncTool
-from toolbox_core import auth_methods
 
-from typing import Any, Awaitable, Callable, List, Mapping, Optional, Union
+from typing import Any, Awaitable, Callable, Mapping, Optional, Union
 
-import asyncio
 
 # ----------------------- Exception -----------------------
 class MCPToolBoxException(Exception):
     """Exception raised for errors in the MCP Toolbox integration."""
-    pass 
 
-
-
+    pass
 
 
 class MCPToolBoxTool:
@@ -22,21 +18,21 @@ class MCPToolBoxTool:
     Factory class to load tools from a Google MCP Toolbox service.
     This class handles the connection to an MCP Toolbox server and provides
     methods to retrieve and wrap remote tools into standard Datapizza-AI Tool objects.
-    
+
     Example:
         ```python
         from datapizza.tools.mcptoolbox import MCPToolBoxTool
-        
+
         # Initialize the factory
         toolbox = MCPToolBoxTool(
             toolbox_url="http://localhost:5000",
             tool_names=["sql_query", "search_user_sql"],
             toolset_names=["reporting_tools"]
         )
-        
+
         # Load all configured tools
         agent_tools = toolbox.load_tools()
-        
+
         # Or load a specific tool on demand
         single_tool = toolbox.load_single_tool("custom_action")
         ```
@@ -47,9 +43,15 @@ class MCPToolBoxTool:
         toolbox_url: str,
         tool_names: list[str] | None = None,
         toolset_names: list[str] | None = None,
-        auth_token_getters: Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]]]] = {},
-        client_headers: Optional[Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]], str]]] = None,
-        bound_params: Mapping[str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]] = {},
+        auth_token_getters: Mapping[
+            str, Union[Callable[[], str], Callable[[], Awaitable[str]]]
+        ] = {},
+        client_headers: Optional[
+            Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]], str]]
+        ] = None,
+        bound_params: Mapping[
+            str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]
+        ] = {},
     ):
         """
         Initializes the MCPToolBox factory.
@@ -72,7 +74,6 @@ class MCPToolBoxTool:
         self.bound_params = bound_params
         self.client = self._create_client()
 
-
     # ----------------------- "Private" methods -----------------------
     def _create_client(self) -> ToolboxSyncClient:
         """
@@ -85,7 +86,9 @@ class MCPToolBoxTool:
             MCPToolBoxException: If there is an error connecting to the server.
         """
         try:
-            return ToolboxSyncClient(self.toolbox_url, client_headers=self.client_headers)
+            return ToolboxSyncClient(
+                self.toolbox_url, client_headers=self.client_headers
+            )
         except ConnectionError as e:
             raise MCPToolBoxException(f"Error connecting to Toolbox server: {e}")
         except Exception as e:
@@ -100,7 +103,7 @@ class MCPToolBoxTool:
         """
         Wraps a ToolboxSyncTool into a Datapizza-AI Tool object.
 
-        Uses the dataclass-based `@tool` decorator logic to preserve the tool's 
+        Uses the dataclass-based `@tool` decorator logic to preserve the tool's
         metadata, including its name, docstring, and parameter signature.
 
         Args:
@@ -112,18 +115,18 @@ class MCPToolBoxTool:
         return tool(
             func=toolbox_tool,
             name=toolbox_tool.__name__,
-            description=toolbox_tool.__doc__
+            description=toolbox_tool.__doc__,
         )
-
-
-
-
 
     # ----------------------- methods for the users -----------------------
     def load_tools(
         self,
-        auth_token_getters: Optional[Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]]]]] = None,
-        bound_params: Optional[Mapping[str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]]] = None,
+        auth_token_getters: Optional[
+            Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]]]]
+        ] = None,
+        bound_params: Optional[
+            Mapping[str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]]
+        ] = None,
     ) -> list[Tool]:
         """
         Loads all configured single tools and toolsets.
@@ -142,9 +145,13 @@ class MCPToolBoxTool:
             MCPToolBoxException: If no tools could be loaded.
         """
         tools: list[Tool] = []
-        
+
         # Use provided overrides or class defaults
-        auth_getters = auth_token_getters if auth_token_getters is not None else self.auth_token_getters
+        auth_getters = (
+            auth_token_getters
+            if auth_token_getters is not None
+            else self.auth_token_getters
+        )
         params = bound_params if bound_params is not None else self.bound_params
 
         # 1. Unified tool list loading logic
@@ -153,14 +160,16 @@ class MCPToolBoxTool:
             if self.tool_names:
                 for tool_name in self.tool_names:
                     try:
-                        tools.append(self.load_single_tool(
-                            tool_name, 
-                            auth_token_getters=auth_getters, 
-                            bound_params=params
-                        ))
+                        tools.append(
+                            self.load_single_tool(
+                                tool_name,
+                                auth_token_getters=auth_getters,
+                                bound_params=params,
+                            )
+                        )
                     except MCPToolBoxException as e:
-                        print(f"⚠️ Warning: {e}")
-            
+                        print(f"Warning: {e}")
+
             # Load specific toolsets
             if self.toolset_names:
                 for toolset_name in self.toolset_names:
@@ -168,33 +177,35 @@ class MCPToolBoxTool:
                         tb_toolset = self.client.load_toolset(
                             toolset_name,
                             auth_token_getters=auth_getters,
-                            bound_params=params
+                            bound_params=params,
                         )
                         for tb_tool in tb_toolset:
                             tools.append(self._datapizza_tool_wrapper(tb_tool))
                     except Exception as e:
-                        print(f"⚠️ Warning: Error loading toolset '{toolset_name}': {e}")
+                        print(f"Warning: Error loading toolset '{toolset_name}': {e}")
         else:
             # 2. Fallback: Load ALL tools from the server if nothing is specified
             try:
-                print("ℹ️ No specific tools/sets requested. Loading default toolset from server.")
+                print(
+                    "No specific tools/sets requested. Loading default toolset from server."
+                )
                 tb_all = self.client.load_toolset(
-                    name=None, 
-                    auth_token_getters=auth_getters, 
-                    bound_params=params
+                    name=None, auth_token_getters=auth_getters, bound_params=params
                 )
                 for tb_tool in tb_all:
                     tools.append(self._datapizza_tool_wrapper(tb_tool))
             except Exception as e:
-                print(f"⚠️ Warning: Error loading all tools from server: {e}")
-        
+                print(f"Warning: Error loading all tools from server: {e}")
+
         if not tools:
-            print("⚠️ Warning: Nessun tool caricato. Controlla la connessione al server o la configurazione.")
-            raise MCPToolBoxException("Zero tools loaded. Check tool_names, toolset_names, or server availability.")
-        
+            print(
+                "Warning: Nessun tool caricato. Controlla la connessione al server o la configurazione."
+            )
+            raise MCPToolBoxException(
+                "Zero tools loaded. Check tool_names, toolset_names, or server availability."
+            )
+
         return tools
-
-
 
     def list_tools(self) -> dict[str, dict[str, Any]]:
         """
@@ -209,25 +220,28 @@ class MCPToolBoxTool:
         try:
             # Temporarily load all tools to extract metadata
             tools = self.load_tools()
-            
+
             info_map = {}
             for t in tools:
                 info_map[t.name] = {
                     "description": t.description,
                     "properties": t.properties,
-                    "required": t.required
+                    "required": t.required,
                 }
             return info_map
         except Exception as e:
-            print(f"⚠️ Error retrieving tools info: {e}")
+            print(f"Error retrieving tools info: {e}")
             return {}
 
-
     def load_single_tool(
-        self, 
+        self,
         tool_name: str,
-        auth_token_getters: Optional[Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]]]]] = None,
-        bound_params: Optional[Mapping[str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]]] = None,
+        auth_token_getters: Optional[
+            Mapping[str, Union[Callable[[], str], Callable[[], Awaitable[str]]]]
+        ] = None,
+        bound_params: Optional[
+            Mapping[str, Union[Callable[[], Any], Callable[[], Awaitable[Any]], Any]]
+        ] = None,
     ) -> Tool:
         """
         Loads a single specific tool from the Toolbox server.
@@ -246,27 +260,31 @@ class MCPToolBoxTool:
         """
         if not tool_name or not tool_name.strip():
             raise ValueError("tool_name must not be empty or whitespace")
-        
+
         # Use provided overrides or class defaults
-        auth_getters = auth_token_getters if auth_token_getters is not None else self.auth_token_getters
+        auth_getters = (
+            auth_token_getters
+            if auth_token_getters is not None
+            else self.auth_token_getters
+        )
         params = bound_params if bound_params is not None else self.bound_params
-        
+
         try:
             tb_tool = self.client.load_tool(
-                tool_name,
-                auth_token_getters=auth_getters,
-                bound_params=params
+                tool_name, auth_token_getters=auth_getters, bound_params=params
             )
             return self._datapizza_tool_wrapper(tb_tool)
         except ValueError as e:
-            raise MCPToolBoxException(f"Can't find tool '{tool_name}' in this server: {e}")
+            raise MCPToolBoxException(
+                f"Can't find tool '{tool_name}' in this server: {e}"
+            )
         except Exception as e:
-            raise MCPToolBoxException(f"Unexpected error loading tool '{tool_name}': {e}")
-        
-        
-
+            raise MCPToolBoxException(
+                f"Unexpected error loading tool '{tool_name}': {e}"
+            )
 
 
 # Va anche passato nell' __init__ quando sarà fatto
 class AsyncMCPToolBoxTool(Tool):
-    def __init__(): pass
+    def __init__():
+        pass

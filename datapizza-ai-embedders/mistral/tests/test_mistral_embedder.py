@@ -10,6 +10,8 @@ def test_openai_embedder_init():
 
 
 def test_openai_embedder_init_with_base_url():
-    embedder = MistralEmbedder(api_key="mistral-test-key", base_url="https://api.mistral.ai")
+    embedder = MistralEmbedder(
+        api_key="mistral-test-key", base_url="https://api.mistral.ai"
+    )
     assert embedder.api_key == "mistral-test-key"
     assert embedder.base_url == "https://api.mistral.ai"

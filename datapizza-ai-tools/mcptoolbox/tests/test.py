@@ -11,10 +11,12 @@ try:
     print("\n ---- Agent 1: created ----")
     client_2 = MCPToolBoxTool(toolbox_url=URL, tool_names=["search_artists"])
     print("\n ---- Agent 2: created ----")
-    client_3 = MCPToolBoxTool(toolbox_url=URL,tool_names=["search_artists"], toolset_names=["neo4j-tools"])
+    client_3 = MCPToolBoxTool(
+        toolbox_url=URL, tool_names=["search_artists"], toolset_names=["neo4j-tools"]
+    )
     print("\n ---- Agent 3: created ----")
 except Exception as e:
-    print(f"❌ Error during testing: {e}")
+    print(f"ERROR during testing: {e}")
 
 
 try:
@@ -35,8 +37,7 @@ try:
     all_discovered = client_2.load_tools()
     print(f"Discovered {len(all_discovered)} tools automatically for client 2.")
     all_discovered = client_3.load_tools()
-    print(f"Discovered {len(all_discovered)} tools automatically for client 3.")    
-
+    print(f"Discovered {len(all_discovered)} tools automatically for client 3.")
 
     # --- Test 4: info() ---
     print("\n--- Test 4: info() for client 1 ---")
@@ -57,13 +58,10 @@ try:
         print(f"\nTool: {name}")
         print(f" - Description: {info['description']}")
         print(f" - Required Params: {info['required']}")
-        
+
 
 except Exception as e:
-    print(f"\n❌ Error during testing: {e}")
-
-
-
+    print(f"\nERROR during testing: {e}")
 
 
 finally:
