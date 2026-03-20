@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata
 [project]
 name = "datapizza-ai-clients-anthropic"
-version = "0.0.6"
+version = "0.0.7"
 description = "Anthropic (Claude) client for the datapizza-ai framework"
 readme = "README.md"
 license = {text = "MIT"}
@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.1.0,<0.2.0",
-    "anthropic>=0.40.0,<1.0.0",
+    "anthropic>=0.77.0,<1.0.0",
 ]
 
 # Development dependencies
