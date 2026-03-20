@@ -1,10 +1,24 @@
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
 
-from datapizza.agents.agent import PLANNING_PROMT, Agent, StepResult
+import pytest
+from pydantic import BaseModel
+
+from datapizza.agents.agent import (
+    PLANNING_PROMT,
+    Agent,
+    AgentHooks,
+    StepContext,
+    StepResult,
+)
+from datapizza.agents.runner import AgentRunner
 from datapizza.clients import MockClient
 from datapizza.core.clients import ClientResponse
+from datapizza.core.clients.models import TokenUsage
+from datapizza.memory import Memory
 from datapizza.tools import tool
+from datapizza.type import ROLE, FunctionCallBlock, TextBlock
 
 
 class TestBaseAgents:
@@ -66,6 +80,100 @@ class TestBaseAgents:
         assert agent_aggregator._tools[0].name == agent1.as_tool().name
         assert agent_aggregator._tools[1].name == agent2.as_tool().name
 
+    def test_as_tool_end_invoke_true(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool(end=True)
+        assert a_tool.end_invoke is True
+
+    def test_as_tool_end_invoke_default_false(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.end_invoke is False
+
+    def test_as_tool_prefers_instance_description(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            description="My custom tool description",
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "My custom tool description"
+
+    def test_as_tool_description_fallback_to_docstring(self):
+        class TestDocAgent(Agent):
+            """Tool description from class docstring."""
+
+            name = "doc_agent"
+            system_prompt = "You are a test agent"
+
+        agent = TestDocAgent(client=MockClient())
+        a_tool = agent.as_tool()
+        assert a_tool.description == "Tool description from class docstring."
+
+    def test_as_tool_description_fallback_to_name(self):
+        agent = Agent(
+            name="name_fallback_agent",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "name_fallback_agent"
+
+    def test_as_tool_empty_description_fallback_to_name(self):
+        agent = Agent(
+            name="empty_description_agent",
+            client=MockClient(),
+            description="",
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        assert a_tool.description == "empty_description_agent"
+
+    def test_as_tool_returns_text_by_default(self):
+        agent = Agent(
+            name="plain_text_agent",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        a_tool = agent.as_tool()
+        result = asyncio.run(a_tool("Hello"))
+        assert result == "Hello"
+
+    def test_as_tool_returns_structured_output_as_json(self):
+        class Person(BaseModel):
+            name: str
+            age: int
+
+        class AsyncStructuredMockClient(MockClient):
+            async def _a_structured_response(self, *args, **kwargs):
+                return self._structured_response(*args, **kwargs)
+
+        agent = Agent(
+            name="structured_agent",
+            client=AsyncStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        a_tool = agent.as_tool()
+        result = asyncio.run(a_tool('{"name":"Alice","age":30}'))
+        assert json.loads(result) == {"name": "Alice", "age": 30}
+
     def test_params_as_class_attributes(self):
         class TestAgent(Agent):
             name = "test"
@@ -101,6 +209,154 @@ class TestBaseAgents:
         assert res[0].text == "H"
         assert res[1].text == "He"
         assert res[2].text == "Hel"
+
+    def test_agent_structured_output_sync(self):
+        class Person(BaseModel):
+            name: str
+            age: int
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        res = agent.run('{"name": "Alice", "age": 30}')
+        assert res
+        assert res.index == 1
+        assert res.text == ""
+        assert len(res.structured_data) == 1
+        assert res.structured_data[0] == Person(name="Alice", age=30)
+
+    def test_agent_structured_output_hard_fail_on_unsupported_client(self):
+        class Person(BaseModel):
+            name: str
+
+        class UnsupportedStructuredMockClient(MockClient):
+            def _structured_response(self, *args, **kwargs):
+                raise NotImplementedError("not supported")
+
+        agent = Agent(
+            name="test",
+            client=UnsupportedStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        with pytest.raises(ValueError, match="does not support structured responses"):
+            agent.run('{"name": "Alice"}')
+
+    def test_agent_structured_output_async_hard_fail_on_unsupported_client(self):
+        class Person(BaseModel):
+            name: str
+
+        class UnsupportedStructuredMockClient(MockClient):
+            def _a_structured_response(self, *args, **kwargs):
+                raise NotImplementedError("not supported")
+
+        agent = Agent(
+            name="test",
+            client=UnsupportedStructuredMockClient(),
+            system_prompt="You are a test agent",
+            output_cls=Person,
+        )
+
+        with pytest.raises(
+            ValueError, match="does not support async structured responses"
+        ):
+            asyncio.run(agent.a_run('{"name": "Alice"}'))
+
+    def test_agent_hooks_run_single_step(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        res = agent.run("Hello")
+
+        assert res.text == "Hello"
+        assert events == [("before", 1, "Hello"), ("after", 1, "Hello")]
+
+    def test_agent_hooks_run_multiple_steps(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            hooks=TestHooks(),
+        )
+
+        res = agent.run("function call")
+
+        assert res.index == 2
+        assert events == [
+            ("before", 1, "function call"),
+            ("after", 1, ""),
+            ("before", 2, ""),
+            ("after", 2, "tool called"),
+        ]
+
+    def test_agent_hooks_async(self):
+        events = []
+
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                events.append(("before", context.step_index, context.task_input))
+
+            def after_step(self, context: StepContext, result: StepResult) -> None:
+                events.append(("after", context.step_index, result.text))
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        res = asyncio.run(agent.a_run("Hello"))
+
+        assert res.text == "Hello"
+        assert events == [("before", 1, "Hello"), ("after", 1, "Hello")]
+
+    def test_agent_hooks_exception_bubbles(self):
+        class TestHooks(AgentHooks):
+            def before_step(self, context: StepContext) -> None:
+                raise RuntimeError("hook failed")
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            hooks=TestHooks(),
+        )
+
+        with pytest.raises(RuntimeError, match="hook failed"):
+            agent.run("Hello")
 
 
 class TestStatelessAgents:
@@ -242,3 +498,482 @@ class TestStatelessAgents:
 
         res = agent.run("function call")
         assert res.index == 2
+
+    def test_terminate_on_text_ignores_text_when_tool_call_is_present(self):
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            terminate_on_text=True,
+        )
+
+        res = agent.run("mixed function call")
+        assert res.index == 2
+        assert res.text == "tool called"
+
+    def test_a_terminate_on_text_ignores_text_when_tool_call_is_present(self):
+        @tool(end=False)
+        def test_tool(*args, **kwargs):
+            return "tool called"
+
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            tools=[test_tool],
+            terminate_on_text=True,
+        )
+
+        res = asyncio.run(agent.a_run("mixed function call"))
+        assert res.index == 2
+        assert res.text == "tool called"
+
+
+class HandoffMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        if tools is None:
+            tools = []
+
+        input_text = ""
+        if isinstance(input, list):
+            for block in input:
+                if isinstance(block, TextBlock):
+                    input_text = block.content
+
+        if input_text == "handoff":
+            handoff_tool = next(
+                tool for tool in tools if tool.name == "transfer_to_specialist"
+            )
+            return ClientResponse(
+                content=[
+                    FunctionCallBlock(
+                        id="handoff-1",
+                        arguments={
+                            "task_input": "delegated",
+                            "reason": "needs specialist",
+                        },
+                        name=handoff_tool.name,
+                        tool=handoff_tool,
+                    )
+                ]
+            )
+
+        if input_text == "delegated":
+            return ClientResponse(
+                content=[TextBlock(content=f"shared:{len(memory) if memory else 0}")]
+            )
+
+        return super()._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class StreamingUsageMockClient(MockClient):
+    def _stream_invoke(
+        self,
+        input,
+        tools=None,
+        memory=None,
+        tool_choice="auto",
+        temperature=None,
+        max_tokens=None,
+        system_prompt=None,
+        **kwargs,
+    ):
+        yield ClientResponse(
+            content=[TextBlock(content="H")],
+            delta="H",
+            usage=TokenUsage(completion_tokens=1),
+        )
+        yield ClientResponse(
+            content=[TextBlock(content="He")],
+            delta="e",
+            usage=TokenUsage(completion_tokens=1),
+        )
+        yield ClientResponse(
+            content=[TextBlock(content="Hey")],
+            delta="y",
+            usage=TokenUsage(completion_tokens=1),
+        )
+
+    async def _a_stream_invoke(
+        self,
+        input,
+        tools=None,
+        memory=None,
+        tool_choice="auto",
+        temperature=None,
+        max_tokens=None,
+        system_prompt=None,
+        **kwargs,
+    ):
+        for chunk in self._stream_invoke(
+            input,
+            tools=tools,
+            memory=memory,
+            tool_choice=tool_choice,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+            **kwargs,
+        ):
+            yield chunk
+
+
+class CyclingHandoffMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        if tools is None:
+            tools = []
+
+        input_text = ""
+        if isinstance(input, list):
+            for block in input:
+                if isinstance(block, TextBlock):
+                    input_text = block.content
+
+        if input_text in {"start", "to_a"}:
+            target = "b"
+            task_input = "to_b"
+        elif input_text == "to_b":
+            target = "a"
+            task_input = "to_a"
+        else:
+            return super()._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+        handoff_tool = next(
+            tool for tool in tools if tool.name == f"transfer_to_{target}"
+        )
+        return ClientResponse(
+            content=[
+                FunctionCallBlock(
+                    id=f"handoff-{target}",
+                    arguments={"task_input": task_input},
+                    name=handoff_tool.name,
+                    tool=handoff_tool,
+                )
+            ]
+        )
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class RuntimeMemoryMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        return ClientResponse(
+            content=[TextBlock(content=f"turns:{len(memory) if memory else 0}")]
+        )
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class GenKwargsEchoMockClient(MockClient):
+    def _invoke(self, input, tools=None, memory=None, **kwargs):
+        temperature = kwargs.get("temperature")
+        return ClientResponse(content=[TextBlock(content=f"temperature:{temperature}")])
+
+    async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
+        return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class TestAgentRunner:
+    def test_agent_run_requires_keyword_tool_choice(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        with pytest.raises(
+            TypeError, match="takes 2 positional arguments but 3 were given"
+        ):
+            agent.run("hello", "required")
+
+    def test_agent_run_preserves_gen_kwargs_with_keyword_only_signature(self):
+        agent = Agent(
+            name="test",
+            client=GenKwargsEchoMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = agent.run("hello", temperature=0.2)
+
+        assert result is not None
+        assert result.text == "temperature:0.2"
+
+    def test_streaming_run_aggregates_usage(self):
+        agent = Agent(
+            name="streaming",
+            client=StreamingUsageMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+        )
+
+        result = agent.run("Hello")
+
+        assert result is not None
+        assert result.text == "Hey"
+        assert result.usage.completion_tokens == 3
+
+    def test_agent_run_preserves_stepresult_with_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            stateless=False,
+            handoffs=[specialist],
+        )
+
+        result = root.run("handoff")
+
+        assert isinstance(result, StepResult)
+        assert result.text == "shared:3"
+        assert len(root._memory) == 5
+
+    def test_runner_returns_high_level_handoff_result(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = AgentRunner().run(root, "handoff")
+
+        assert result.final_step is not None
+        assert result.final_step.text == "shared:3"
+        assert result.final_agent is specialist
+        assert result.handoff_count == 1
+        assert result.visited_agents == ["root", "specialist"]
+        memory_dict = result.memory.to_dict()
+        serialized_memory = str(memory_dict)
+        assert "Transfer to specialist completed" in serialized_memory
+
+    def test_runner_async_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = asyncio.run(root.a_run("handoff"))
+
+        assert result is not None
+        assert result.text == "shared:3"
+
+    def test_stream_invoke_handoff(self):
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        results = list(root.stream_invoke("handoff"))
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "shared:3"
+
+    def test_a_stream_invoke_handoff(self):
+        async def run_stream():
+            specialist = Agent(
+                name="specialist",
+                client=HandoffMockClient(),
+                system_prompt="You are a specialist",
+            )
+            root = Agent(
+                name="root",
+                client=HandoffMockClient(),
+                system_prompt="You are a root agent",
+                handoffs=[specialist],
+            )
+
+            results = []
+            async for item in root.a_stream_invoke("handoff"):
+                results.append(item)
+            return results
+
+        results = asyncio.run(run_stream())
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "shared:3"
+
+    def test_runner_stream_enforces_max_handoffs(self):
+        agent_a = Agent(
+            name="a",
+            client=CyclingHandoffMockClient(),
+            system_prompt="You are agent a",
+        )
+        agent_b = Agent(
+            name="b",
+            client=CyclingHandoffMockClient(),
+            system_prompt="You are agent b",
+        )
+        agent_a.can_handoff(agent_b)
+        agent_b.can_handoff(agent_a)
+
+        runner = AgentRunner(max_handoffs=1)
+
+        with pytest.raises(RuntimeError, match="Maximum handoffs exceeded"):
+            list(runner.stream(agent_a, "start"))
+
+    def test_run_accepts_runtime_memory(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = agent.run("hello", memory=memory)
+
+        assert result is not None
+        assert result.text == "turns:1"
+        assert len(memory) == 1
+
+    def test_runtime_memory_does_not_replace_stateful_agent_memory(self):
+        default_memory = Memory()
+        default_memory.add_turn(TextBlock(content="default history"), role=ROLE.USER)
+        runtime_memory = Memory()
+        runtime_memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+            stateless=False,
+            memory=default_memory,
+        )
+
+        result = agent.run("hello", memory=runtime_memory)
+
+        assert result is not None
+        assert result.text == "turns:1"
+        assert agent._memory is default_memory
+        assert len(agent._memory) == 1
+        assert len(runtime_memory) == 1
+
+    def test_handoff_uses_runtime_memory(self):
+        runtime_memory = Memory()
+        runtime_memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        specialist = Agent(
+            name="specialist",
+            client=HandoffMockClient(),
+            system_prompt="You are a specialist",
+        )
+        root = Agent(
+            name="root",
+            client=HandoffMockClient(),
+            system_prompt="You are a root agent",
+            handoffs=[specialist],
+        )
+
+        result = root.run("handoff", memory=runtime_memory)
+
+        assert result is not None
+        assert result.text == "shared:4"
+
+    def test_runner_accepts_runtime_memory(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        result = AgentRunner().run(agent, "hello", memory=memory)
+
+        assert result.final_step is not None
+        assert result.final_step.text == "turns:1"
+        assert result.memory is not memory
+        assert len(result.memory) == 3
+        assert len(memory) == 1
+
+    def test_a_run_runtime_memory_is_not_mutated(self):
+        async def run_test():
+            memory = Memory()
+            memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+            agent = Agent(
+                name="memory_agent",
+                client=RuntimeMemoryMockClient(),
+                system_prompt="You are a test agent",
+            )
+
+            result = await agent.a_run("hello", memory=memory)
+
+            assert result is not None
+            assert result.text == "turns:1"
+            assert len(memory) == 1
+
+        asyncio.run(run_test())
+
+    def test_stream_runtime_memory_is_not_mutated(self):
+        memory = Memory()
+        memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+        agent = Agent(
+            name="memory_agent",
+            client=RuntimeMemoryMockClient(),
+            system_prompt="You are a test agent",
+        )
+
+        results = list(agent.stream_invoke("hello", memory=memory))
+
+        assert isinstance(results[-1], StepResult)
+        assert results[-1].text == "turns:1"
+        assert len(memory) == 1
+
+    def test_a_stream_runtime_memory_is_not_mutated(self):
+        async def run_test():
+            memory = Memory()
+            memory.add_turn(TextBlock(content="remember this"), role=ROLE.USER)
+
+            agent = Agent(
+                name="memory_agent",
+                client=RuntimeMemoryMockClient(),
+                system_prompt="You are a test agent",
+            )
+
+            results = []
+            async for item in agent.a_stream_invoke("hello", memory=memory):
+                results.append(item)
+
+            assert isinstance(results[-1], StepResult)
+            assert results[-1].text == "turns:1"
+            assert len(memory) == 1
+
+        asyncio.run(run_test())

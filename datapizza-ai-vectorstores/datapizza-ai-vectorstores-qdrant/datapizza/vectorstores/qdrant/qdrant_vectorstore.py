@@ -339,19 +339,36 @@ class QdrantVectorstore(Vectorstore):
         ) = None
         config = None
         try:
-            config = {
-                v.name: models.VectorParams(
-                    size=v.dimensions,  # type: ignore
-                    distance=v.distance.value,  # type: ignore
-                )
-                for v in vector_config
-                if v.format == EmbeddingFormat.DENSE
-            }
-            sparse_config = {
-                v.name: models.SparseVectorParams()
-                for v in vector_config
-                if v.format == EmbeddingFormat.SPARSE
-            }
+            if (
+                len(vector_config) == 1
+                and vector_config[0].format == EmbeddingFormat.DENSE
+            ):
+                v = vector_config[0]
+                if v.name is None:
+                    config = models.VectorParams(
+                        size=v.dimensions,  # type: ignore
+                        distance=v.distance.value,  # type: ignore
+                    )
+                else:
+                    config = {
+                        v.name: models.VectorParams(
+                            size=v.dimensions, distance=v.distance.value
+                        )
+                    }
+            else:
+                config = {
+                    v.name: models.VectorParams(
+                        size=v.dimensions,  # type: ignore
+                        distance=v.distance.value,  # type: ignore
+                    )
+                    for v in vector_config
+                    if v.format == EmbeddingFormat.DENSE
+                }
+                sparse_config = {
+                    v.name: models.SparseVectorParams()
+                    for v in vector_config
+                    if v.format == EmbeddingFormat.SPARSE
+                }
 
             client.create_collection(
                 collection_name=collection_name,

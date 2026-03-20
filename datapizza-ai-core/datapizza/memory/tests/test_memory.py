@@ -1,3 +1,4 @@
+import json
 from typing import TypeVar
 
 from pydantic import BaseModel
@@ -193,6 +194,35 @@ def test_memory_json_dumps_with_function_call_result():
             ],
         }
     ]
+
+
+def test_memory_json_dumps_with_function_call_bytes_thought_signature():
+    @tool
+    def get_weather(city: str) -> str:
+        """Get the weather for a city"""
+        return f"The weather in {city} is sunny"
+
+    memory = Memory()
+    memory.add_turn(
+        blocks=[
+            FunctionCallBlock(
+                id="1",
+                arguments={"city": "Rome"},
+                name="get_weather",
+                tool=get_weather,
+                thought_signature=b"\x01\x02\x03",
+            )
+        ],
+        role=ROLE.ASSISTANT,
+    )
+
+    dumped = memory.json_dumps()
+    payload = json.loads(dumped)
+
+    assert payload[0]["blocks"][0]["thought_signature"] == {
+        "encoding": "base64",
+        "data": "AQID",
+    }
 
 
 def test_structured_block():
