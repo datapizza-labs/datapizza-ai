@@ -143,7 +143,7 @@ def test_memory_to_messages_structured_block():
     messages = OpenAIMemoryAdapter().memory_to_messages(memory)
     assert messages[0]["content"] == "{'key': 'value'}" or messages[0]["content"] == [
         {
-            "type": "text",
+            "type": "input_text",
             "text": "{'key': 'value'}",
         }
     ]

@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
@@ -6,7 +7,14 @@ from datapizza.core.clients import Client, ClientResponse
 from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import Tool
-from datapizza.type import FunctionCallBlock, TextBlock, ThoughtBlock
+from datapizza.type import (
+    Block,
+    FunctionCallBlock,
+    Model,
+    StructuredBlock,
+    TextBlock,
+    ThoughtBlock,
+)
 
 from anthropic import Anthropic, AsyncAnthropic
 
@@ -135,6 +143,46 @@ class AnthropicClient(Client):
                 cached_tokens=response.usage.cache_read_input_tokens,
             ),
         )
+
+    def _usage_from_anthropic_response(self, response: Any) -> TokenUsage:
+        usage = response.usage
+        return TokenUsage(
+            prompt_tokens=usage.input_tokens,
+            completion_tokens=usage.output_tokens,
+            cached_tokens=getattr(usage, "cache_read_input_tokens", None) or 0,
+        )
+
+    def _structured_messages(
+        self, input: list[Block], memory: Memory | None
+    ) -> list[dict]:
+        messages = self._memory_to_contents(None, input, memory)
+        return [m for m in messages if m.get("role") != "model"]
+
+    def _structured_request_params(
+        self,
+        *,
+        messages: list[dict],
+        max_tokens: int | None,
+        temperature: float | None,
+        system_prompt: str | None,
+        tools: list[Tool],
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_tokens": max_tokens or 2048,
+            **kwargs,
+        }
+        if temperature:
+            params["temperature"] = temperature
+        if system_prompt:
+            params["system"] = system_prompt
+        if tools:
+            params["tools"] = self._convert_tools(tools)
+            params["tool_choice"] = self._convert_tool_choice(tool_choice)
+        return params
 
     def _invoke(
         self,
@@ -390,10 +438,116 @@ class AnthropicClient(Client):
 
     def _structured_response(
         self,
-        *args,
-        **kwargs,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs: Any,
     ) -> ClientResponse:
-        raise NotImplementedError("Anthropic does not support structured responses")
+        if tools is None:
+            tools = []
+        client = self._get_client()
+        messages = self._structured_messages(input, memory)
+        params = self._structured_request_params(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs,
+        )
 
-    async def _a_structured_response(self, *args, **kwargs):
-        raise NotImplementedError("Anthropic does not support structured responses")
+        if output_cls == {"type": "json_object"}:
+            params["output_config"] = {
+                "format": {
+                    "type": "json_schema",
+                    "schema": {"type": "object", "additionalProperties": True},
+                }
+            }
+            response = client.messages.create(**params)
+            text: str | None = None
+            for block in response.content:
+                if block.type == "text":
+                    text = block.text
+                    break
+            if text is None:
+                raise ValueError("No text block in Anthropic structured response")
+            data = json.loads(text)
+            return ClientResponse(
+                content=[StructuredBlock(content=data)],
+                stop_reason=response.stop_reason,
+                usage=self._usage_from_anthropic_response(response),
+            )
+
+        response = client.messages.parse(**params, output_format=output_cls)
+        parsed = response.parsed_output
+        if parsed is None:
+            raise ValueError("No parsed_output in Anthropic structured response")
+        return ClientResponse(
+            content=[StructuredBlock(content=parsed)],
+            stop_reason=response.stop_reason,
+            usage=self._usage_from_anthropic_response(response),
+        )
+
+    async def _a_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs: Any,
+    ) -> ClientResponse:
+        if tools is None:
+            tools = []
+        client = self._get_a_client()
+        messages = self._structured_messages(input, memory)
+        params = self._structured_request_params(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs,
+        )
+
+        if output_cls == {"type": "json_object"}:
+            params["output_config"] = {
+                "format": {
+                    "type": "json_schema",
+                    "schema": {"type": "object", "additionalProperties": True},
+                }
+            }
+            response = await client.messages.create(**params)
+            text: str | None = None
+            for block in response.content:
+                if block.type == "text":
+                    text = block.text
+                    break
+            if text is None:
+                raise ValueError("No text block in Anthropic structured response")
+            data = json.loads(text)
+            return ClientResponse(
+                content=[StructuredBlock(content=data)],
+                stop_reason=response.stop_reason,
+                usage=self._usage_from_anthropic_response(response),
+            )
+
+        response = await client.messages.parse(**params, output_format=output_cls)
+        parsed = response.parsed_output
+        if parsed is None:
+            raise ValueError("No parsed_output in Anthropic structured response")
+        return ClientResponse(
+            content=[StructuredBlock(content=parsed)],
+            stop_reason=response.stop_reason,
+            usage=self._usage_from_anthropic_response(response),
+        )
