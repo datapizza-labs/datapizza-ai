@@ -137,6 +137,89 @@ class OpenAILikeClient(Client):
         else:
             return tool_choice
 
+    def _accumulate_stream_delta(
+        self,
+        delta,
+        streamed_tool_calls: dict[int | str, dict[str, str]],
+    ) -> str:
+        if delta is None:
+            return ""
+
+        if getattr(delta, "tool_calls", None):
+            for tool_call_delta in delta.tool_calls:
+                key = getattr(tool_call_delta, "index", None)
+                if key is None:
+                    key = getattr(tool_call_delta, "id", None) or 0
+
+                entry = streamed_tool_calls.setdefault(
+                    key,
+                    {"id": "", "name": "", "arguments": ""},
+                )
+
+                tool_call_id = getattr(tool_call_delta, "id", None)
+                if tool_call_id:
+                    entry["id"] = tool_call_id
+
+                function = getattr(tool_call_delta, "function", None)
+                if function is None:
+                    continue
+
+                function_name = getattr(function, "name", None)
+                if function_name:
+                    entry["name"] = function_name
+
+                function_arguments = getattr(function, "arguments", None)
+                if function_arguments:
+                    entry["arguments"] += function_arguments
+
+        return delta.content if getattr(delta, "content", None) else ""
+
+    def _build_streamed_tool_call_blocks(
+        self,
+        streamed_tool_calls: dict[int | str, dict[str, str]],
+        tool_map: dict[str, Tool],
+    ) -> list[FunctionCallBlock]:
+        blocks: list[FunctionCallBlock] = []
+
+        for _, streamed_tool_call in sorted(
+            streamed_tool_calls.items(), key=lambda item: str(item[0])
+        ):
+            function_name = streamed_tool_call["name"]
+            if not function_name:
+                continue
+
+            tool = tool_map.get(function_name)
+            if not tool:
+                raise ValueError(f"Tool {function_name} not found")
+
+            raw_arguments = streamed_tool_call["arguments"] or "{}"
+            blocks.append(
+                FunctionCallBlock(
+                    id=streamed_tool_call["id"] or function_name,
+                    name=function_name,
+                    arguments=json.loads(raw_arguments),
+                    tool=tool,
+                )
+            )
+
+        return blocks
+
+    def _build_streamed_content(
+        self,
+        message_content: str,
+        streamed_tool_calls: dict[int | str, dict[str, str]],
+        tool_map: dict[str, Tool],
+    ) -> list[TextBlock | FunctionCallBlock]:
+        content: list[TextBlock | FunctionCallBlock] = []
+
+        if message_content:
+            content.append(TextBlock(content=message_content))
+
+        content.extend(
+            self._build_streamed_tool_call_blocks(streamed_tool_calls, tool_map)
+        )
+        return content
+
     def _invoke(
         self,
         *,
@@ -223,6 +306,7 @@ class OpenAILikeClient(Client):
         if tools is None:
             tools = []
         messages = self._memory_to_contents(system_prompt, input, memory)
+        tool_map = {tool.name: tool for tool in tools}
         kwargs = {
             "model": self.model_name,
             "messages": messages,
@@ -242,25 +326,31 @@ class OpenAILikeClient(Client):
         message_content = ""
         usage = TokenUsage()
         finish_reason = None
+        streamed_tool_calls: dict[int | str, dict[str, str]] = {}
 
         for chunk in response:
             usage_metadata = getattr(chunk, "usage", None)
             token_usage = self._token_usage_from_metadata(usage_metadata)
             usage += token_usage
 
+            delta = None
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 finish_reason = chunk.choices[0].finish_reason
 
-            delta_content = delta.content if delta and delta.content else ""
+            delta_content = self._accumulate_stream_delta(delta, streamed_tool_calls)
             message_content = message_content + delta_content
-            yield ClientResponse(
-                content=[TextBlock(content=message_content)],
-                delta=delta_content,
-                stop_reason=finish_reason or None,
-            )
+
+            if delta_content:
+                yield ClientResponse(
+                    content=[TextBlock(content=message_content)],
+                    delta=delta_content,
+                    stop_reason=finish_reason or None,
+                )
         yield ClientResponse(
-            content=[TextBlock(content=message_content)],
+            content=self._build_streamed_content(
+                message_content, streamed_tool_calls, tool_map
+            ),
             stop_reason=finish_reason or None,
             usage=usage,
         )
@@ -279,6 +369,7 @@ class OpenAILikeClient(Client):
         if tools is None:
             tools = []
         messages = self._memory_to_contents(system_prompt, input, memory)
+        tool_map = {tool.name: tool for tool in tools}
         kwargs = {
             "model": self.model_name,
             "messages": messages,
@@ -298,26 +389,31 @@ class OpenAILikeClient(Client):
         message_content = ""
         usage = TokenUsage()
         finish_reason = None
+        streamed_tool_calls: dict[int | str, dict[str, str]] = {}
 
         async for chunk in await a_client.chat.completions.create(**kwargs):
             usage_metadata = getattr(chunk, "usage", None)
             token_usage = self._token_usage_from_metadata(usage_metadata)
             usage += token_usage
 
+            delta = None
             if len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 finish_reason = chunk.choices[0].finish_reason
 
-            delta_content = delta.content if delta and delta.content else ""
+            delta_content = self._accumulate_stream_delta(delta, streamed_tool_calls)
             message_content = message_content + delta_content
 
-            yield ClientResponse(
-                content=[TextBlock(content=message_content)],
-                delta=delta_content,
-                stop_reason=finish_reason or None,
-            )
+            if delta_content:
+                yield ClientResponse(
+                    content=[TextBlock(content=message_content)],
+                    delta=delta_content,
+                    stop_reason=finish_reason or None,
+                )
         yield ClientResponse(
-            content=[TextBlock(content=message_content)],
+            content=self._build_streamed_content(
+                message_content, streamed_tool_calls, tool_map
+            ),
             stop_reason=finish_reason or None,
             usage=usage,
         )
