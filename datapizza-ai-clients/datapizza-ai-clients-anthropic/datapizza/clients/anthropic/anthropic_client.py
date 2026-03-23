@@ -152,6 +152,131 @@ class AnthropicClient(Client):
             cached_tokens=getattr(usage, "cache_read_input_tokens", None) or 0,
         )
 
+    def _new_stream_state(self) -> dict[str, Any]:
+        return {
+            "message_text": "",
+            "thought_text": "",
+            "tool_calls": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "stop_reason": None,
+        }
+
+    def _consume_stream_event(self, state: dict[str, Any], chunk: Any) -> str:
+        text_delta = ""
+
+        if chunk.type == "message_start":
+            if getattr(chunk, "message", None) and getattr(
+                chunk.message, "usage", None
+            ):
+                state["input_tokens"] = chunk.message.usage.input_tokens or 0
+            return text_delta
+
+        if chunk.type == "content_block_start":
+            content_block = getattr(chunk, "content_block", None)
+            if content_block and getattr(content_block, "type", None) == "tool_use":
+                state["tool_calls"][chunk.index] = {
+                    "id": getattr(content_block, "id", None),
+                    "name": getattr(content_block, "name", None),
+                    "input_json_chunks": [],
+                    "parsed_input": (
+                        dict(content_block.input)
+                        if getattr(content_block, "input", None)
+                        else None
+                    ),
+                }
+            return text_delta
+
+        if chunk.type == "content_block_delta":
+            delta = getattr(chunk, "delta", None)
+            if not delta:
+                return text_delta
+
+            if getattr(delta, "text", None):
+                text_delta = delta.text
+                state["message_text"] += delta.text
+                return text_delta
+
+            if getattr(delta, "thinking", None):
+                state["thought_text"] += delta.thinking
+                return text_delta
+
+            if getattr(delta, "partial_json", None):
+                tool_state = state["tool_calls"].setdefault(
+                    chunk.index,
+                    {
+                        "id": None,
+                        "name": None,
+                        "input_json_chunks": [],
+                        "parsed_input": None,
+                    },
+                )
+                tool_state["input_json_chunks"].append(delta.partial_json)
+                return text_delta
+
+            return text_delta
+
+        if chunk.type == "message_delta":
+            if getattr(chunk, "usage", None):
+                state["output_tokens"] = max(
+                    state["output_tokens"],
+                    chunk.usage.output_tokens or 0,
+                )
+
+            delta = getattr(chunk, "delta", None)
+            if delta and hasattr(delta, "stop_reason"):
+                state["stop_reason"] = delta.stop_reason
+
+        return text_delta
+
+    def _build_streamed_tool_call_blocks(
+        self,
+        tool_calls: dict[int, dict[str, Any]],
+        tool_map: dict[str, Tool],
+    ) -> list[FunctionCallBlock]:
+        blocks: list[FunctionCallBlock] = []
+
+        for _, tool_state in sorted(tool_calls.items()):
+            tool_name = tool_state.get("name")
+            if not tool_name:
+                continue
+
+            tool = tool_map.get(tool_name)
+            if not tool:
+                raise ValueError(f"Tool {tool_name} not found")
+
+            parsed_input = tool_state.get("parsed_input")
+            if parsed_input is None:
+                input_json = "".join(tool_state.get("input_json_chunks", []))
+                parsed_input = json.loads(input_json) if input_json else {}
+
+            blocks.append(
+                FunctionCallBlock(
+                    id=tool_state.get("id") or tool_name,
+                    name=tool_name,
+                    arguments=parsed_input,
+                    tool=tool,
+                )
+            )
+
+        return blocks
+
+    def _build_stream_final_content(
+        self,
+        state: dict[str, Any],
+        tool_map: dict[str, Tool],
+    ) -> list[ThoughtBlock | TextBlock | FunctionCallBlock]:
+        content: list[ThoughtBlock | TextBlock | FunctionCallBlock] = []
+
+        if state["thought_text"]:
+            content.append(ThoughtBlock(content=state["thought_text"]))
+        if state["message_text"]:
+            content.append(TextBlock(content=state["message_text"]))
+        content.extend(
+            self._build_streamed_tool_call_blocks(state["tool_calls"], tool_map)
+        )
+        return content
+
     def _structured_messages(
         self, input: list[Block], memory: Memory | None
     ) -> list[dict]:
@@ -283,6 +408,7 @@ class AnthropicClient(Client):
             tools = []
         messages = self._memory_to_contents(None, input, memory)
         client = self._get_client()
+        tool_map = {tool.name: tool for tool in tools}
 
         request_params = {
             "model": self.model_name,
@@ -303,50 +429,27 @@ class AnthropicClient(Client):
             request_params["tool_choice"] = self._convert_tool_choice(tool_choice)
 
         stream = client.messages.create(**request_params)
-
-        input_tokens = 0
-        output_tokens = 0
-        message_text = ""
-        thought_text = ""
+        state = self._new_stream_state()
 
         for chunk in stream:
-            if (
-                chunk.type == "content_block_delta"
-                and hasattr(chunk, "delta")
-                and chunk.delta
-            ):
-                if hasattr(chunk.delta, "text") and chunk.delta.text:
-                    message_text += chunk.delta.text
-                    yield ClientResponse(
-                        content=[
-                            ThoughtBlock(content=thought_text),
-                            TextBlock(content=message_text),
-                        ],
-                        delta=chunk.delta.text,
-                    )
-                elif hasattr(chunk.delta, "thinking") and chunk.delta.thinking:
-                    thought_text += chunk.delta.thinking
-
-            if chunk.type == "message_start":
-                input_tokens = (
-                    chunk.message.usage.input_tokens if chunk.message.usage else 0
-                )
-
-            if chunk.type == "message_delta":
-                output_tokens = max(
-                    output_tokens, chunk.usage.output_tokens if chunk.usage else 0
+            text_delta = self._consume_stream_event(state, chunk)
+            if text_delta:
+                yield ClientResponse(
+                    content=[
+                        ThoughtBlock(content=state["thought_text"]),
+                        TextBlock(content=state["message_text"]),
+                    ],
+                    delta=text_delta,
+                    stop_reason=state["stop_reason"],
                 )
 
         yield ClientResponse(
-            content=[
-                ThoughtBlock(content=thought_text),
-                TextBlock(content=message_text),
-            ],
+            content=self._build_stream_final_content(state, tool_map),
             delta="",
-            stop_reason="end_turn",
+            stop_reason=state["stop_reason"],
             usage=TokenUsage(
-                prompt_tokens=input_tokens,
-                completion_tokens=output_tokens,
+                prompt_tokens=state["input_tokens"],
+                completion_tokens=state["output_tokens"],
                 cached_tokens=0,
             ),
         )
@@ -367,6 +470,7 @@ class AnthropicClient(Client):
             tools = []
         messages = self._memory_to_contents(None, input, memory)
         client = self._get_a_client()
+        tool_map = {tool.name: tool for tool in tools}
 
         request_params = {
             "model": self.model_name,
@@ -388,50 +492,27 @@ class AnthropicClient(Client):
             request_params["tool_choice"] = self._convert_tool_choice(tool_choice)
 
         stream = await client.messages.create(**request_params)
-
-        input_tokens = 0
-        output_tokens = 0
-        message_text = ""
-        thought_text = ""
+        state = self._new_stream_state()
 
         async for chunk in stream:
-            if (
-                chunk.type == "content_block_delta"
-                and hasattr(chunk, "delta")
-                and chunk.delta
-            ):
-                if hasattr(chunk.delta, "text") and chunk.delta.text:
-                    message_text += chunk.delta.text
-                    yield ClientResponse(
-                        content=[
-                            ThoughtBlock(content=thought_text),
-                            TextBlock(content=message_text),
-                        ],
-                        delta=chunk.delta.text,
-                    )
-                elif hasattr(chunk.delta, "thinking") and chunk.delta.thinking:
-                    thought_text += chunk.delta.thinking
-
-            if chunk.type == "message_start":
-                input_tokens = (
-                    chunk.message.usage.input_tokens if chunk.message.usage else 0
-                )
-
-            if chunk.type == "message_delta":
-                output_tokens = max(
-                    output_tokens, chunk.usage.output_tokens if chunk.usage else 0
+            text_delta = self._consume_stream_event(state, chunk)
+            if text_delta:
+                yield ClientResponse(
+                    content=[
+                        ThoughtBlock(content=state["thought_text"]),
+                        TextBlock(content=state["message_text"]),
+                    ],
+                    delta=text_delta,
+                    stop_reason=state["stop_reason"],
                 )
 
         yield ClientResponse(
-            content=[
-                ThoughtBlock(content=thought_text),
-                TextBlock(content=message_text),
-            ],
+            content=self._build_stream_final_content(state, tool_map),
             delta="",
-            stop_reason="end_turn",
+            stop_reason=state["stop_reason"],
             usage=TokenUsage(
-                prompt_tokens=input_tokens,
-                completion_tokens=output_tokens,
+                prompt_tokens=state["input_tokens"],
+                completion_tokens=state["output_tokens"],
                 cached_tokens=0,
             ),
         )
