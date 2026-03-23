@@ -297,6 +297,75 @@ class GoogleClient(Client):
         )
         return self._response_to_client_response(response, tool_map)
 
+    def _build_stream_function_call_block(
+        self,
+        part,
+        tool_map: dict[str, Tool],
+        index: int,
+    ) -> FunctionCallBlock:
+        fc = part.function_call
+        tool = tool_map.get(fc.name)
+        if not tool:
+            raise ValueError(f"Tool {fc.name} not found in tool map")
+
+        thought_sig = getattr(part, "thought_signature", None)
+        return FunctionCallBlock(
+            name=fc.name,
+            arguments=dict(fc.args) if fc.args else {},
+            id=f"fc_{index}",
+            tool=tool,
+            thought_signature=thought_sig,
+        )
+
+    def _consume_stream_parts(
+        self,
+        parts,
+        *,
+        tool_map: dict[str, Tool],
+        thought_text: str,
+        function_call_blocks: list[FunctionCallBlock],
+    ) -> tuple[str, str]:
+        text_delta_parts: list[str] = []
+
+        for part in parts:
+            if hasattr(part, "function_call") and part.function_call:
+                function_call_blocks.append(
+                    self._build_stream_function_call_block(
+                        part,
+                        tool_map,
+                        len(function_call_blocks),
+                    )
+                )
+                continue
+
+            part_text = getattr(part, "text", None)
+            if not part_text:
+                continue
+
+            if hasattr(part, "thought") and part.thought:
+                thought_text += part_text
+                continue
+
+            text_delta_parts.append(part_text)
+
+        return "".join(text_delta_parts), thought_text
+
+    def _build_stream_final_content(
+        self,
+        *,
+        thought_text: str,
+        message_text: str,
+        function_call_blocks: list[FunctionCallBlock],
+    ) -> list[ThoughtBlock | TextBlock | FunctionCallBlock]:
+        content: list[ThoughtBlock | TextBlock | FunctionCallBlock] = []
+
+        if thought_text:
+            content.append(ThoughtBlock(content=thought_text))
+        if message_text:
+            content.append(TextBlock(content=message_text))
+        content.extend(function_call_blocks)
+        return content
+
     def _stream_invoke(
         self,
         input: str,
@@ -312,6 +381,7 @@ class GoogleClient(Client):
         if tools is None:
             tools = []
         contents = self._memory_to_contents(None, input, memory)
+        tool_map = {tool.name: tool for tool in tools if isinstance(tool, Tool)}
 
         prepared_tools = self._prepare_tools(tools)
         config = types.GenerateContentConfig(
@@ -327,8 +397,8 @@ class GoogleClient(Client):
 
         message_text = ""
         stop_reason = ""
-        thought_block = ThoughtBlock(content="")
-
+        thought_text = ""
+        function_call_blocks: list[FunctionCallBlock] = []
         usage = TokenUsage()
 
         for chunk in self.client.models.generate_content_stream(
@@ -352,30 +422,34 @@ class GoogleClient(Client):
                 raise ValueError("No content in response")
 
             if not chunk.candidates[0].content.parts:
-                yield ClientResponse(
-                    content=[],
-                    delta=chunk.text or "",
-                    stop_reason=stop_reason,
-                    usage=usage,
-                )
+                if chunk.text:
+                    yield ClientResponse(
+                        content=[],
+                        delta=chunk.text,
+                        stop_reason=stop_reason,
+                        usage=usage,
+                    )
                 continue
 
-            for part in chunk.candidates[0].content.parts:
-                if not part.text:
-                    continue
-                elif hasattr(part, "thought") and part.thought:
-                    thought_block.content += part.text
-                else:  # If it's not a thought, it's a message
-                    if part.text:
-                        message_text += str(chunk.text or "")
-
-                        yield ClientResponse(
-                            content=[],
-                            delta=chunk.text or "",
-                            stop_reason=stop_reason,
-                        )
+            text_delta, thought_text = self._consume_stream_parts(
+                chunk.candidates[0].content.parts,
+                tool_map=tool_map,
+                thought_text=thought_text,
+                function_call_blocks=function_call_blocks,
+            )
+            if text_delta:
+                message_text += text_delta
+                yield ClientResponse(
+                    content=[],
+                    delta=text_delta,
+                    stop_reason=stop_reason,
+                )
         yield ClientResponse(
-            content=[TextBlock(content=message_text)],
+            content=self._build_stream_final_content(
+                thought_text=thought_text,
+                message_text=message_text,
+                function_call_blocks=function_call_blocks,
+            ),
             stop_reason=stop_reason,
             usage=usage,
         )
@@ -395,6 +469,7 @@ class GoogleClient(Client):
         if tools is None:
             tools = []
         contents = self._memory_to_contents(None, input, memory)
+        tool_map = {tool.name: tool for tool in tools if isinstance(tool, Tool)}
 
         prepared_tools = self._prepare_tools(tools)
         config = types.GenerateContentConfig(
@@ -411,7 +486,8 @@ class GoogleClient(Client):
         usage = TokenUsage()
         message_text = ""
         stop_reason = ""
-        thought_block = ThoughtBlock(content="")
+        thought_text = ""
+        function_call_blocks: list[FunctionCallBlock] = []
         async for chunk in await self.client.aio.models.generate_content_stream(
             model=self.model_name,
             contents=contents,  # type: ignore
@@ -433,28 +509,33 @@ class GoogleClient(Client):
             # Handle the case where the response has no parts
             candidate_content = chunk.candidates[0].content
             if not candidate_content or not candidate_content.parts:
-                yield ClientResponse(
-                    content=[],
-                    delta=chunk.text or "",
-                    stop_reason=stop_reason,
-                )
+                if chunk.text:
+                    yield ClientResponse(
+                        content=[],
+                        delta=chunk.text,
+                        stop_reason=stop_reason,
+                    )
                 continue
 
-            for part in candidate_content.parts:
-                if not part.text:
-                    continue
-                elif hasattr(part, "thought") and part.thought:
-                    thought_block.content += part.text
-                else:  # If it's not a thought, it's a message
-                    if part.text:
-                        message_text += chunk.text or ""
-                        yield ClientResponse(
-                            content=[],
-                            delta=chunk.text or "",
-                            stop_reason=stop_reason,
-                        )
+            text_delta, thought_text = self._consume_stream_parts(
+                candidate_content.parts,
+                tool_map=tool_map,
+                thought_text=thought_text,
+                function_call_blocks=function_call_blocks,
+            )
+            if text_delta:
+                message_text += text_delta
+                yield ClientResponse(
+                    content=[],
+                    delta=text_delta,
+                    stop_reason=stop_reason,
+                )
         yield ClientResponse(
-            content=[TextBlock(content=message_text)],
+            content=self._build_stream_final_content(
+                thought_text=thought_text,
+                message_text=message_text,
+                function_call_blocks=function_call_blocks,
+            ),
             stop_reason=stop_reason,
             usage=usage,
         )
