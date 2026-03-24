@@ -201,7 +201,7 @@ class OpenAIClient(Client):
 
     def _convert_tools(self, tool: Tool) -> dict:
         """Convert tools to OpenAI function format"""
-        return {
+        result = {
             "type": "function",
             "name": tool.name,
             "description": tool.description,
@@ -211,6 +211,10 @@ class OpenAIClient(Client):
                 "required": tool.required,
             },
         }
+        if tool.strict:
+            result["parameters"]["additionalProperties"] = False
+
+        return result
 
     def _convert_tool_choice(
         self, tool_choice: Literal["auto", "required", "none"] | list[str]
