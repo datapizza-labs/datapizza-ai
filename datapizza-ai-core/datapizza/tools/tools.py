@@ -23,7 +23,7 @@ class Tool:
         end: bool = False,
         properties: dict[str, dict[str, Any]] | None = None,
         required: list[str] | None = None,
-        strict: bool = False,
+        strict: bool = True,
     ):
         """
         Args:
@@ -117,7 +117,7 @@ class Tool:
         }
 
 
-def tool(func=None, name=None, description=None, end=False, strict=False):
+def tool(func=None, name=None, description=None, end=False, strict=True):
     """
     Decorator to wrap a function in a DecoratedFunc instance.
 
