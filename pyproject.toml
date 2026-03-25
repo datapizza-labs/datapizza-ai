@@ -24,6 +24,7 @@ dependencies = [
     "datapizza-ai-clients-openai>=0.0.1",
     "datapizza-ai-embedders-openai>=0.0.1",
     "datapizza-ai-vectorstores-qdrant>=0.0.1",
+    "datapizza-ai-tools-mcptoolbox>=0.0.1",
 ]
 
 # Development dependencies
@@ -73,6 +74,7 @@ members = [
     "datapizza-ai-tools/sqldatabase",
     "datapizza-ai-tools/filesystem",
     "datapizza-ai-tools/web_fetch",
+    "datapizza-ai-tools/mcptoolbox",
 
 ]
 
@@ -111,6 +113,7 @@ datapizza-ai-tools-duckduckgo = {workspace = true}
 datapizza-ai-tools-filesystem = {workspace = true}
 datapizza-ai-tools-sqldatabase = {workspace = true}
 datapizza-ai-tools-web-fetch = {workspace = true}
+datapizza-ai-tools-mcptoolbox = {workspace = true}
 
 
 # Hatch build configuration
