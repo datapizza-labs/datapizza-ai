@@ -5,10 +5,10 @@ from pydantic import BaseModel, Field
 from datapizza.type import (
     Block,
     FunctionCallBlock,
+    Model,
     StructuredBlock,
     TextBlock,
     ThoughtBlock,
-    Model
 )
 
 
