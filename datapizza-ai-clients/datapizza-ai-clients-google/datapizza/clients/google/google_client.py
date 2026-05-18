@@ -42,6 +42,7 @@ class GoogleClient(Client):
         location: str | None = None,
         credentials_path: str | None = None,
         use_vertexai: bool = False,
+        **kwargs,
     ):
         """
         Args:
@@ -54,6 +55,8 @@ class GoogleClient(Client):
             location: The location for the Google API.
             credentials_path: The path to the credentials for the Google API.
             use_vertexai: Whether to use Vertex AI for the Google API.
+            **kwargs: Additional keyword arguments forwarded to the underlying
+                ``genai.Client`` constructor.
         """
         if temperature and not 0 <= temperature <= 2:
             raise ValueError("Temperature must be between 0 and 2")
@@ -84,12 +87,13 @@ class GoogleClient(Client):
                     project=project_id,
                     location=location,
                     credentials=credentials,
+                    **kwargs,
                 )
             else:
                 if not api_key:
                     raise ValueError("api_key must be provided")
 
-                self.client = genai.Client(api_key=api_key)
+                self.client = genai.Client(api_key=api_key, **kwargs)
 
         except Exception as e:
             raise RuntimeError(
