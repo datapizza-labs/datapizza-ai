@@ -1,6 +1,7 @@
 title: Tools
 nav:
   - mcp.md
+  - mcptoolbox.md
   - duckduckgo.md
   - filesystem.md
   - SQLDatabase.md
