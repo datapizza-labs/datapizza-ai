@@ -64,6 +64,7 @@ members = [
     # Vectorstores
     "datapizza-ai-vectorstores/datapizza-ai-vectorstores-qdrant",
     "datapizza-ai-vectorstores/datapizza-ai-vectorstores-milvus",
+    "datapizza-ai-vectorstores/datapizza-ai-vectorstores-redis",
 
     # Cache
     "datapizza-ai-cache/redis",
@@ -102,6 +103,7 @@ datapizza-ai-rerankers-together = {workspace = true}
 
 # Vectorstores
 datapizza-ai-vectorstores-qdrant = {workspace = true}
+datapizza-ai-vectorstores-redis = {workspace = true}
 
 # Cache
 datapizza-ai-cache-redis = {workspace = true}

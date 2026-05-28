@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "datapizza-ai-core>=0.1.0,<0.2.0",
-    "redis>=5.2.1,<6.0.0",
+    "redis>=5.2.1,<=7.4.0",
 ]
 
 # Development dependencies
