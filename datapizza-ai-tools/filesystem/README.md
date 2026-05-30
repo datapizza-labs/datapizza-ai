@@ -196,3 +196,25 @@ Agent Response: Successfully deleted directory '/tmp/tmp_XXXXXX/initial_dir'.
 
 Cleaned up temporary directory: /tmp/tmp_XXXXXX (actual path will vary)
 ```
+
+> ⚠️ **Warning**: Paths are not automatically normalized. Malicious inputs like `../../../../etc/passwd` may bypass `paths_to_include`/`paths_to_exclude` filters, leading to **path traversal vulnerabilities**.
+
+**Best Practices**:
+- Normalize paths using `os.path.normpath` before any operation.
+- Restrict access to known-safe directories using `paths_to_include`.
+
+**Example: Safe Path Handling in Python**
+```python
+import os
+
+def safe_path(base_dir, user_path):
+    # Ensure the user-provided path stays within the base directory.
+    norm_path = os.path.normpath(os.path.join(base_dir, user_path))
+    if not norm_path.startswith(base_dir):
+        raise ValueError("Path traversal attempt detected")
+    return norm_path
+
+# Usage:
+base_dir = "/safe/directory"
+safe_user_path = safe_path(base_dir, user_input_path)
+```
