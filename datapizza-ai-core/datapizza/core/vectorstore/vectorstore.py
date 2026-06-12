@@ -43,7 +43,7 @@ class Vectorstore(ChainableProducer):
         pass
 
     @abstractmethod
-    def update(self, collection_name: str, payload: dict, points: list[int], **kwargs):
+    def update(self, collection_name: str, payload: dict, points: list[str | int], **kwargs):
         pass
 
     @abstractmethod
