@@ -1,10 +1,17 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
 from datapizza.tools import tool
 from datapizza.type import FunctionCallBlock
+from pydantic import BaseModel, ValidationError
 
 from datapizza.clients.openai_like import OpenAILikeClient
+
+
+class Person(BaseModel):
+    name: str
+    age: int
 
 
 def _chunk(*, content=None, finish_reason=None, tool_calls=None, usage=None):
@@ -26,17 +33,23 @@ def _usage_chunk():
 class FakeStreamClient:
     def __init__(self, chunks):
         self._chunks = chunks
-        self.chat = SimpleNamespace(
-            completions=SimpleNamespace(create=lambda **kwargs: iter(self._chunks))
-        )
+        self.captured_kwargs = None
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+    def create(self, **kwargs):
+        self.captured_kwargs = kwargs
+        return iter(self._chunks)
 
 
 class FakeAsyncStreamClient:
     def __init__(self, chunks):
         self._chunks = chunks
+        self.captured_kwargs = None
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
 
     async def create(self, **kwargs):
+        self.captured_kwargs = kwargs
+
         async def iterator():
             for chunk in self._chunks:
                 yield chunk
@@ -197,3 +210,106 @@ def test_a_stream_invoke_reconstructs_tool_calls():
         "when": "tomorrow",
     }
     assert final_response.stop_reason == "tool_calls"
+
+
+def _structured_chunks():
+    return [
+        _chunk(content='{"name":"Ada"'),
+        _chunk(content=',"age":36}'),
+        _chunk(
+            finish_reason="stop",
+            usage=SimpleNamespace(
+                prompt_tokens=3, completion_tokens=9, prompt_tokens_details=None
+            ),
+        ),
+    ]
+
+
+def test_stream_structured_response():
+    client = OpenAILikeClient(api_key="test", model="test-model")
+    fake = FakeStreamClient(_structured_chunks())
+    client.client = fake
+
+    responses = list(
+        client.stream_structured_response(input="Tell me about Ada", output_cls=Person)
+    )
+
+    deltas = responses[:-1]
+    assert all(response.content == [] for response in deltas)
+    assert "".join(response.delta for response in deltas) == '{"name":"Ada","age":36}'
+
+    final_response = responses[-1]
+    assert not final_response.delta
+    assert final_response.structured_data == [Person(name="Ada", age=36)]
+    assert final_response.stop_reason == "stop"
+    assert final_response.usage.prompt_tokens == 3
+    assert final_response.usage.completion_tokens == 9
+
+    assert fake.captured_kwargs["stream"] is True
+    assert fake.captured_kwargs["stream_options"] == {"include_usage": True}
+    response_format = fake.captured_kwargs["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    assert response_format["json_schema"]["schema"]["additionalProperties"] is False
+
+
+def test_a_stream_structured_response():
+    client = OpenAILikeClient(api_key="test", model="test-model")
+    fake = FakeAsyncStreamClient(_structured_chunks())
+    client.a_client = fake
+
+    async def collect():
+        return [
+            response
+            async for response in client.a_stream_structured_response(
+                input="Tell me about Ada", output_cls=Person
+            )
+        ]
+
+    responses = asyncio.run(collect())
+
+    deltas = responses[:-1]
+    assert "".join(response.delta for response in deltas) == '{"name":"Ada","age":36}'
+
+    final_response = responses[-1]
+    assert not final_response.delta
+    assert final_response.structured_data == [Person(name="Ada", age=36)]
+    assert final_response.usage.completion_tokens == 9
+    assert fake.captured_kwargs["response_format"]["type"] == "json_schema"
+
+
+def test_stream_structured_response_invalid_json():
+    client = OpenAILikeClient(api_key="test", model="test-model")
+    client.client = FakeStreamClient(
+        [
+            _chunk(content='{"name": '),
+            _chunk(finish_reason="length"),
+        ]
+    )
+
+    with pytest.raises(ValidationError):
+        list(
+            client.stream_structured_response(
+                input="Tell me about Ada", output_cls=Person
+            )
+        )
+
+
+def test_stream_structured_response_json_object_sentinel():
+    client = OpenAILikeClient(api_key="test", model="test-model")
+    fake = FakeStreamClient(
+        [
+            _chunk(content='{"name":"Ada"}'),
+            _chunk(finish_reason="stop"),
+        ]
+    )
+    client.client = fake
+
+    responses = list(
+        client.stream_structured_response(
+            input="Tell me about Ada", output_cls={"type": "json_object"}
+        )
+    )
+
+    assert fake.captured_kwargs["response_format"] == {"type": "json_object"}
+    assert responses[-1].structured_data == [{"name": "Ada"}]

@@ -17,6 +17,7 @@ from datapizza.type import (
     TextBlock,
 )
 from openai import AsyncOpenAI, OpenAI
+from openai.lib._parsing._completions import type_to_response_format_param
 
 from .memory_adapter import OpenAILikeMemoryAdapter
 
@@ -414,6 +415,173 @@ class OpenAILikeClient(Client):
             content=self._build_streamed_content(
                 message_content, streamed_tool_calls, tool_map
             ),
+            stop_reason=finish_reason or None,
+            usage=usage,
+        )
+
+    def _validate_structured_text(self, output_cls, text: str):
+        if hasattr(output_cls, "model_validate_json"):
+            return output_cls.model_validate_json(text)
+        return json.loads(text)
+
+    def _structured_stream_kwargs(
+        self,
+        input,
+        output_cls: type[Model],
+        memory: Memory | None,
+        temperature: float | None,
+        max_tokens: int | None,
+        system_prompt: str | None,
+        tools: list[Tool] | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        **kwargs,
+    ) -> dict:
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": True,
+            "max_completion_tokens": max_tokens,
+            "stream_options": {"include_usage": True},
+            "response_format": type_to_response_format_param(output_cls),
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+            # Structured response needs strict mode and no additional properties
+            for tool in kwargs["tools"]:
+                tool["function"]["strict"] = True
+                tool["function"]["parameters"]["additionalProperties"] = False
+
+        return kwargs
+
+    def _stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        tool_map = {tool.name: tool for tool in tools}
+        kwargs = self._structured_stream_kwargs(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        response = self.client.chat.completions.create(**kwargs)
+        message_content = ""
+        usage = TokenUsage()
+        finish_reason = None
+        streamed_tool_calls: dict[int | str, dict[str, str]] = {}
+
+        for chunk in response:
+            usage_metadata = getattr(chunk, "usage", None)
+            usage += self._token_usage_from_metadata(usage_metadata)
+
+            delta = None
+            if len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+            delta_content = self._accumulate_stream_delta(delta, streamed_tool_calls)
+            message_content = message_content + delta_content
+
+            if delta_content:
+                yield ClientResponse(content=[], delta=delta_content)
+
+        content = self._build_streamed_tool_call_blocks(streamed_tool_calls, tool_map)
+        if message_content:
+            content.insert(
+                0,
+                StructuredBlock(
+                    content=self._validate_structured_text(output_cls, message_content)
+                ),
+            )
+        yield ClientResponse(
+            content=content,
+            delta="",
+            stop_reason=finish_reason or None,
+            usage=usage,
+        )
+
+    async def _a_stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        tool_map = {tool.name: tool for tool in tools}
+        kwargs = self._structured_stream_kwargs(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        a_client = self._get_a_client()
+        message_content = ""
+        usage = TokenUsage()
+        finish_reason = None
+        streamed_tool_calls: dict[int | str, dict[str, str]] = {}
+
+        async for chunk in await a_client.chat.completions.create(**kwargs):
+            usage_metadata = getattr(chunk, "usage", None)
+            usage += self._token_usage_from_metadata(usage_metadata)
+
+            delta = None
+            if len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+            delta_content = self._accumulate_stream_delta(delta, streamed_tool_calls)
+            message_content = message_content + delta_content
+
+            if delta_content:
+                yield ClientResponse(content=[], delta=delta_content)
+
+        content = self._build_streamed_tool_call_blocks(streamed_tool_calls, tool_map)
+        if message_content:
+            content.insert(
+                0,
+                StructuredBlock(
+                    content=self._validate_structured_text(output_cls, message_content)
+                ),
+            )
+        yield ClientResponse(
+            content=content,
+            delta="",
             stop_reason=finish_reason or None,
             usage=usage,
         )
