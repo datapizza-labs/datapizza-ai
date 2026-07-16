@@ -43,6 +43,10 @@ If you want to log the input/output and the memory passed to client invoke you s
 
 default is `FALSE`
 
+The same flag also gates tool spans: tool arguments and results (which may contain
+file contents, database rows or other sensitive data) are attached to trace spans
+only when `DATAPIZZA_TRACE_CLIENT_IO=TRUE`. With the default they are omitted.
+
 
 
 ## Manual Span Creation
