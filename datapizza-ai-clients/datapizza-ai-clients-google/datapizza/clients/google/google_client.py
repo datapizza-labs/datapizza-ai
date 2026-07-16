@@ -1,4 +1,5 @@
 import base64
+import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Literal
 
@@ -640,6 +641,143 @@ class GoogleClient(Client):
             if response.candidates[0].finish_reason
             else None,
             usage=token_usage,
+        )
+
+    def _validate_structured_text(self, output_cls, text: str):
+        if hasattr(output_cls, "model_validate_json"):
+            return output_cls.model_validate_json(text)
+        return json.loads(text)
+
+    def _structured_stream_config(
+        self,
+        output_cls: type[Model],
+        temperature: float | None,
+        max_tokens: int | None,
+        system_prompt: str | None,
+        tools: list[Tool] | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        **kwargs,
+    ) -> types.GenerateContentConfig:
+        prepared_tools = self._prepare_tools(tools)
+        return types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            response_mime_type="application/json",
+            tools=prepared_tools,  # type: ignore
+            tool_config=self._convert_tool_choice(tool_choice)
+            if tools and any(isinstance(tool, Tool) for tool in tools)
+            else None,
+            response_schema=(
+                output_cls.model_json_schema()
+                if hasattr(output_cls, "model_json_schema")
+                else output_cls
+            ),
+            **kwargs,
+        )
+
+    def _stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        contents = self._memory_to_contents(self.system_prompt, input, memory)
+        config = self._structured_stream_config(
+            output_cls,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        text = ""
+        usage = TokenUsage()
+        stop_reason = None
+        for chunk in self.client.models.generate_content_stream(
+            model=self.model_name,
+            contents=contents,  # type: ignore
+            config=config,
+        ):
+            usage += self._token_usage_from_metadata(
+                getattr(chunk, "usage_metadata", None)
+            )
+            # JSON-mode streams can send keep-alive chunks without candidates
+            # or parts: skip them instead of raising.
+            if chunk.candidates:
+                finish_reason = chunk.candidates[0].finish_reason
+                if finish_reason is not None:
+                    stop_reason = finish_reason.value.lower()
+            if chunk.text:
+                text += chunk.text
+                yield ClientResponse(content=[], delta=chunk.text)
+
+        yield ClientResponse(
+            content=[
+                StructuredBlock(content=self._validate_structured_text(output_cls, text))
+            ],
+            delta="",
+            stop_reason=stop_reason,
+            usage=usage,
+        )
+
+    async def _a_stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        contents = self._memory_to_contents(self.system_prompt, input, memory)
+        config = self._structured_stream_config(
+            output_cls,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        text = ""
+        usage = TokenUsage()
+        stop_reason = None
+        async for chunk in await self.client.aio.models.generate_content_stream(
+            model=self.model_name,
+            contents=contents,  # type: ignore
+            config=config,
+        ):  # type: ignore
+            usage += self._token_usage_from_metadata(
+                getattr(chunk, "usage_metadata", None)
+            )
+            if chunk.candidates:
+                finish_reason = chunk.candidates[0].finish_reason
+                if finish_reason is not None:
+                    stop_reason = finish_reason.value.lower()
+            if chunk.text:
+                text += chunk.text
+                yield ClientResponse(content=[], delta=chunk.text)
+
+        yield ClientResponse(
+            content=[
+                StructuredBlock(content=self._validate_structured_text(output_cls, text))
+            ],
+            delta="",
+            stop_reason=stop_reason,
+            usage=usage,
         )
 
     def _embed(
