@@ -1,4 +1,5 @@
 import inspect
+import os
 from collections.abc import AsyncGenerator, Generator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
@@ -19,6 +20,16 @@ from datapizza.type import (
 
 if TYPE_CHECKING:
     from .agent import Agent, Plan, StepResult
+
+
+def _trace_tool_io_enabled() -> bool:
+    """Whether tool arguments/results may be exported to trace spans.
+
+    Mirrors the client I/O gate so tool spans do not leak arguments and
+    results (which can carry file contents, DB rows or PII) to trace
+    exporters unless the operator explicitly opts in.
+    """
+    return os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true"
 
 
 @dataclass
@@ -1090,16 +1101,19 @@ class AgentRunner:
         self, function_call: FunctionCallBlock, agent: "Agent"
     ) -> FunctionCallResultBlock:
         with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute(
-                "tool_arguments", str(function_call.arguments)
-            )
+            trace_io = _trace_tool_io_enabled()
+            if trace_io:
+                current_tool_span.set_attribute(
+                    "tool_arguments", str(function_call.arguments)
+                )
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
                 result = AsyncExecutor.get_instance().run(result)
 
             if result:
-                current_tool_span.set_attribute("tool_result", result)
+                if trace_io:
+                    current_tool_span.set_attribute("tool_result", result)
                 agent._logger.log_panel(
                     result,
                     title=f"TOOL {function_call.tool.name.upper()} RESULT",
@@ -1115,16 +1129,19 @@ class AgentRunner:
         self, function_call: FunctionCallBlock, agent: "Agent"
     ) -> FunctionCallResultBlock:
         with tool_span(f"Tool {function_call.tool.name}") as current_tool_span:
-            current_tool_span.set_attribute(
-                "tool_arguments", str(function_call.arguments)
-            )
+            trace_io = _trace_tool_io_enabled()
+            if trace_io:
+                current_tool_span.set_attribute(
+                    "tool_arguments", str(function_call.arguments)
+                )
             result = function_call.tool(**function_call.arguments)
 
             if inspect.iscoroutine(result):
                 result = await result
 
             if result:
-                current_tool_span.set_attribute("tool_result", result)
+                if trace_io:
+                    current_tool_span.set_attribute("tool_result", result)
                 agent._logger.log_panel(
                     result,
                     title=f"TOOL {function_call.tool.name.upper()} RESULT",
