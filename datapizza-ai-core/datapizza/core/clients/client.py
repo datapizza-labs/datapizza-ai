@@ -549,6 +549,250 @@ class Client(ChainableProducer):
         assert isinstance(response, ClientResponse)
         return response
 
+    def stream_structured_response(
+        self,
+        *,
+        input: str | list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        """
+        Streams the model's structured response as it is generated.
+
+        Each intermediate chunk is a ClientResponse whose `delta` holds a raw
+        JSON text fragment and whose `content` is empty. The final chunk has a
+        falsy `delta` and carries the validated result as a StructuredBlock in
+        `content`, along with `usage` and `stop_reason`. Chunk `usage` values
+        are incremental (consumers sum them), never cumulative.
+
+        Every yielded chunk also carries `snapshot` (the JSON text accumulated
+        so far; the full text on the final chunk) and exposes `partial`, a
+        best-effort parse of the snapshot (usually a dict) for progressive
+        consumption. A field in `partial` may still be incomplete until the
+        following key appears in the stream; `structured_data` on the final
+        chunk remains the only validated result.
+
+        Args:
+            input (str): The input text/prompt to send to the model
+            output_cls (Type[Model]): The class type to structure the response into
+            memory (Memory, optional): Memory object containing conversation history. Defaults to None.
+            temperature (float, optional): Controls randomness in responses. Defaults to None.
+            max_tokens (int, optional): Maximum number of tokens in the response. Defaults to None.
+            system_prompt (str, optional): System-level instructions for the model. Defaults to None.
+            tools (List[Tool], optional): List of tools available for the model to use. Defaults to [].
+            tool_choice (Literal["auto", "required", "none"] | list[str], optional): Controls which tool to use ("auto" by default). Defaults to "auto".
+            **kwargs: Additional keyword arguments to pass to the model's inference method
+
+        Returns:
+            An iterator yielding ClientResponse objects containing the structured response
+
+        Raises:
+            ValueError: If output_cls is not a BaseModel subclass or {"type": "json_object"}.
+            NotImplementedError: If the client does not support streaming structured responses.
+            pydantic.ValidationError: If the completed stream is not valid JSON for output_cls.
+            Being a generator, errors surface at first iteration, not at call time.
+        """
+        if output_cls != {"type": "json_object"} and not issubclass(
+            output_cls, BaseModel
+        ):
+            raise ValueError(
+                "output_cls must be a subclass of Model or must be {'type': 'json_object'}"
+            )
+
+        if isinstance(input, str) and input:
+            input = [TextBlock(content=input)]
+        elif input == "":
+            input = []
+
+        with generation_span("client.stream_structured_response") as span:
+            log.debug(
+                f"Stream structured response model {self.__class__.__name__} with input: {input}, memory: {memory}"
+            )
+            first_response = True
+            last_response = None
+
+            response_stream = self._stream_structured_response(
+                input,
+                output_cls,
+                memory,
+                temperature or self.temperature,
+                max_tokens,
+                system_prompt or self.system_prompt,
+                tools,
+                tool_choice,
+                **kwargs,
+            )
+            buffer = ""
+            for r in response_stream:
+                if first_response:
+                    span.set_attribute("time_at_first_token", int(time.time() * 1000))
+                    first_response = False
+
+                if r.delta:
+                    buffer += r.delta
+                r.snapshot = buffer
+
+                last_response = r
+                yield r
+
+            if last_response:
+                span.set_attribute(
+                    "prompt_tokens_used", last_response.prompt_tokens_used
+                )
+                span.set_attribute(
+                    "completion_tokens_used", last_response.completion_tokens_used
+                )
+                span.set_attribute(
+                    "cached_tokens_used", last_response.cached_tokens_used
+                )
+                span.set_attribute(
+                    "thinking_tokens_used", last_response.thinking_tokens_used
+                )
+                span.set_attribute("model_name", self.model_name)
+                span.set_attribute("stop_reason", last_response.stop_reason or "None")
+                if os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true":
+                    span.set_attribute(
+                        "input",
+                        json.dumps([b.to_dict() for b in input]) if input else "",
+                    )
+                    span.set_attribute(
+                        "output",
+                        str(last_response.structured_data[0])
+                        if last_response.structured_data
+                        else last_response.text,
+                    )
+                    span.set_attribute(
+                        "memory", memory.json_dumps() if memory else "None"
+                    )
+
+    async def a_stream_structured_response(
+        self,
+        *,
+        input: str | list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        """
+        Streams the model's structured response asynchronously as it is generated.
+
+        Each intermediate chunk is a ClientResponse whose `delta` holds a raw
+        JSON text fragment and whose `content` is empty. The final chunk has a
+        falsy `delta` and carries the validated result as a StructuredBlock in
+        `content`, along with `usage` and `stop_reason`. Chunk `usage` values
+        are incremental (consumers sum them), never cumulative.
+
+        Every yielded chunk also carries `snapshot` (the JSON text accumulated
+        so far; the full text on the final chunk) and exposes `partial`, a
+        best-effort parse of the snapshot (usually a dict) for progressive
+        consumption. A field in `partial` may still be incomplete until the
+        following key appears in the stream; `structured_data` on the final
+        chunk remains the only validated result.
+
+        Args:
+            input (str): The input text/prompt to send to the model
+            output_cls (Type[Model]): The class type to structure the response into
+            memory (Memory, optional): Memory object containing conversation history. Defaults to None.
+            temperature (float, optional): Controls randomness in responses. Defaults to None.
+            max_tokens (int, optional): Maximum number of tokens in the response. Defaults to None.
+            system_prompt (str, optional): System-level instructions for the model. Defaults to None.
+            tools (List[Tool], optional): List of tools available for the model to use. Defaults to [].
+            tool_choice (Literal["auto", "required", "none"] | list[str], optional): Controls which tool to use ("auto" by default). Defaults to "auto".
+            **kwargs: Additional keyword arguments to pass to the model's inference method
+
+        Returns:
+            An async iterator yielding ClientResponse objects containing the structured response
+
+        Raises:
+            ValueError: If output_cls is not a BaseModel subclass or {"type": "json_object"}.
+            NotImplementedError: If the client does not support streaming structured responses.
+            pydantic.ValidationError: If the completed stream is not valid JSON for output_cls.
+            Being a generator, errors surface at first iteration, not at call time.
+        """
+        if output_cls != {"type": "json_object"} and not issubclass(
+            output_cls, BaseModel
+        ):
+            raise ValueError(
+                "output_cls must be a subclass of Model or must be {'type': 'json_object'}"
+            )
+
+        if isinstance(input, str) and input:
+            input = [TextBlock(content=input)]
+        elif input == "":
+            input = []
+
+        with generation_span("client.a_stream_structured_response") as span:
+            log.debug(
+                f"Stream structured response model {self.__class__.__name__} with input: {input}, memory: {memory}"
+            )
+            first_response = True
+            last_response = None
+
+            response_stream = self._a_stream_structured_response(
+                input,
+                output_cls,
+                memory,
+                temperature or self.temperature,
+                max_tokens,
+                system_prompt or self.system_prompt,
+                tools,
+                tool_choice,
+                **kwargs,
+            )
+            buffer = ""
+            async for r in response_stream:
+                if first_response:
+                    span.set_attribute("time_at_first_token", int(time.time() * 1000))
+                    first_response = False
+
+                if r.delta:
+                    buffer += r.delta
+                r.snapshot = buffer
+
+                last_response = r
+                yield r
+
+            if last_response:
+                span.set_attribute(
+                    "prompt_tokens_used", last_response.prompt_tokens_used
+                )
+                span.set_attribute(
+                    "completion_tokens_used", last_response.completion_tokens_used
+                )
+                span.set_attribute(
+                    "cached_tokens_used", last_response.cached_tokens_used
+                )
+                span.set_attribute(
+                    "thinking_tokens_used", last_response.thinking_tokens_used
+                )
+                span.set_attribute("model_name", self.model_name)
+                span.set_attribute("stop_reason", last_response.stop_reason or "None")
+                if os.getenv("DATAPIZZA_TRACE_CLIENT_IO", "false").lower() == "true":
+                    span.set_attribute(
+                        "input",
+                        json.dumps([b.to_dict() for b in input]) if input else "",
+                    )
+                    span.set_attribute(
+                        "output",
+                        str(last_response.structured_data[0])
+                        if last_response.structured_data
+                        else last_response.text,
+                    )
+                    span.set_attribute(
+                        "memory", memory.json_dumps() if memory else "None"
+                    )
+
     @abstractmethod
     def _invoke(
         self,
@@ -650,6 +894,58 @@ class Client(ChainableProducer):
         """
         pass
 
+    # Not abstract on purpose: streaming structured output is an optional
+    # capability (like _embed), so existing Client subclasses keep working
+    # and consumers can catch NotImplementedError to fall back.
+    def _stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        """
+        Internal method to implement the streaming structured response call.
+
+        Implementations must yield intermediate ClientResponse chunks with
+        `delta` set to the raw JSON text fragment and empty `content`, then a
+        final chunk with a falsy `delta`, `content=[StructuredBlock(...)]`
+        holding the validated output_cls instance, plus `usage` and
+        `stop_reason`. Usage must be incremental per chunk (consumers sum it).
+        """
+        raise NotImplementedError(
+            "Streaming structured responses are not implemented for this client"
+        )
+
+    async def _a_stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        """
+        Internal method to implement the async streaming structured response call.
+
+        Same chunk contract as `_stream_structured_response`.
+        """
+        raise NotImplementedError(
+            "async streaming structured responses are not implemented for this client"
+        )
+        # Unreachable: makes this an async generator function, so consumers
+        # doing `async for` get NotImplementedError instead of a TypeError.
+        yield
+
     def _memory_to_contents(
         self, system_prompt: str | None, input: str, memory: Memory | None = None
     ) -> list[dict]:
@@ -726,6 +1022,9 @@ class Client(ChainableProducer):
     def as_structured_response_module_component(self):
         return StructuredResponseInferenceClientModule(self)
 
+    def as_stream_structured_response_module_component(self):
+        return StreamStructuredResponseInferenceClientModule(self)
+
 
 class InferenceClientModule(PipelineComponent):
     def __init__(self, client: Client):
@@ -758,3 +1057,14 @@ class StreamInferenceClientModule(PipelineComponent):
 
     async def _a_run(self, **kwargs):
         return self.client.a_stream_invoke(**kwargs)
+
+
+class StreamStructuredResponseInferenceClientModule(PipelineComponent):
+    def __init__(self, client: Client):
+        self.client = client
+
+    def _run(self, **kwargs):
+        return self.client.stream_structured_response(**kwargs)
+
+    async def _a_run(self, **kwargs):
+        return self.client.a_stream_structured_response(**kwargs)

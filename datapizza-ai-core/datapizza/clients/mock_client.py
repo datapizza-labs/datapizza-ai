@@ -235,6 +235,63 @@ class MockClient(Client):
                 content=[TextBlock(content=given_response)], delta=char
             )
 
+    def _stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ):
+        if not input or not isinstance(input[0], TextBlock):
+            raise ValueError("input must be a list of TextBlock")
+
+        json_text = input[0].content
+        for char in json_text:
+            yield ClientResponse(content=[], delta=char)
+
+        yield ClientResponse(
+            content=[
+                StructuredBlock(content=output_cls.model_validate_json(json_text))
+            ],
+            delta=None,
+            stop_reason="stop",
+            usage=TokenUsage(
+                prompt_tokens=len(json_text),
+                completion_tokens=len(json_text),
+                cached_tokens=0,
+            ),
+        )
+
+    async def _a_stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ):
+        for chunk in self._stream_structured_response(
+            input=input,
+            output_cls=output_cls,
+            memory=memory,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs,
+        ):
+            yield chunk
+
     def _convert_tool_choice(self, tool_choice: str | list[str]) -> dict:
         return {}
 
