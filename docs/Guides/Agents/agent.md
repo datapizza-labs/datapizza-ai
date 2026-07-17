@@ -194,6 +194,8 @@ When `output_cls` is set:
 - the parsed objects are available in `result.structured_data`
 - `result.text` may be empty
 
+With `stream=True`, `stream_invoke` / `a_stream_invoke` stream the structured output too: they yield the raw JSON fragments as `ClientResponse` chunks (via `chunk.delta`) before the final `StepResult` carrying `structured_data`. Each chunk also exposes `chunk.snapshot` (the JSON accumulated so far) and `chunk.partial` (a best-effort parsed dict for progressive display). Clients without streaming structured support fall back transparently to a single non-streamed structured call (in that case no delta chunks are yielded).
+
 If the selected client does not support structured output, Datapizza raises a clear `ValueError`.
 
 ## Choose a multi-agent pattern

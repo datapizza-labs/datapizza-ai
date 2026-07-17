@@ -19,6 +19,7 @@ from datapizza.type import (
     TextBlock,
 )
 from mistralai import Mistral
+from mistralai.extra import response_format_from_pydantic_model
 from mistralai.models.ocrresponse import OCRResponse
 
 from .memory_adapter import MistralMemoryAdapter
@@ -417,6 +418,135 @@ class MistralClient(Client):
             content=[StructuredBlock(content=structured_data)],
             stop_reason=stop_reason,
             usage=token_usage,
+        )
+
+    def _validate_structured_text(self, output_cls, text: str):
+        if hasattr(output_cls, "model_validate_json"):
+            return output_cls.model_validate_json(text)
+        return json.loads(text)
+
+    def _structured_stream_params(
+        self,
+        input,
+        output_cls: type[Model],
+        memory: Memory | None,
+        temperature: float | None,
+        max_tokens: int | None,
+        system_prompt: str | None,
+        tools: list[Tool] | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        **kwargs,
+    ) -> dict:
+        messages = self._memory_to_contents(system_prompt, input, memory)
+        request_params = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "response_format": (
+                output_cls
+                if isinstance(output_cls, dict)
+                else response_format_from_pydantic_model(output_cls)
+            ),
+            **kwargs,
+        }
+
+        if temperature:
+            request_params["temperature"] = temperature
+
+        if tools:
+            request_params["tools"] = [self._convert_tools(tool) for tool in tools]
+            request_params["tool_choice"] = self._convert_tool_choice(tool_choice)
+
+        return request_params
+
+    def _stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        request_params = self._structured_stream_params(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        response = self.client.chat.stream(**request_params)
+        text = ""
+        usage = TokenUsage()
+        stop_reason = None
+        for chunk in response:
+            usage += self._token_usage_from_metadata(getattr(chunk.data, "usage", None))
+            stop_reason = chunk.data.choices[0].finish_reason
+            delta = str(chunk.data.choices[0].delta.content or "")
+            if delta:
+                text += delta
+                yield ClientResponse(content=[], delta=delta)
+
+        yield ClientResponse(
+            content=[
+                StructuredBlock(content=self._validate_structured_text(output_cls, text))
+            ],
+            delta="",
+            stop_reason=stop_reason,
+            usage=usage,
+        )
+
+    async def _a_stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        request_params = self._structured_stream_params(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        response = await self.client.chat.stream_async(**request_params)
+        text = ""
+        usage = TokenUsage()
+        stop_reason = None
+        async for chunk in response:
+            usage += self._token_usage_from_metadata(getattr(chunk.data, "usage", None))
+            stop_reason = chunk.data.choices[0].finish_reason
+            delta = str(chunk.data.choices[0].delta.content or "")
+            if delta:
+                text += delta
+                yield ClientResponse(content=[], delta=delta)
+
+        yield ClientResponse(
+            content=[
+                StructuredBlock(content=self._validate_structured_text(output_cls, text))
+            ],
+            delta="",
+            stop_reason=stop_reason,
+            usage=usage,
         )
 
     def _embed(

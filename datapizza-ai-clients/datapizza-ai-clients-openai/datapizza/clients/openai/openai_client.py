@@ -486,6 +486,142 @@ class OpenAIClient(Client):
 
         return self._response_to_client_response(response, tool_map)
 
+    def _structured_stream_kwargs(
+        self,
+        input,
+        output_cls: type[Model],
+        memory: Memory | None,
+        temperature: float | None,
+        max_tokens: int | None,
+        system_prompt: str | None,
+        tools: list[Tool] | None,
+        tool_choice: Literal["auto", "required", "none"] | list[str],
+        **kwargs,
+    ) -> dict:
+        messages = self._memory_to_contents(system_prompt, input, memory)
+
+        kwargs = {
+            "model": self.model_name,
+            "input": messages,
+            "max_output_tokens": max_tokens,
+            **kwargs,
+        }
+        if temperature:
+            kwargs["temperature"] = temperature
+
+        if tools:
+            kwargs["tools"] = [self._convert_tools(tool) for tool in tools]
+            kwargs["tool_choice"] = self._convert_tool_choice(tool_choice)
+            # Structured response needs strict mode and no additional properties
+            for tool in kwargs["tools"]:
+                tool["strict"] = True
+                tool["parameters"]["additionalProperties"] = False
+
+        if output_cls == {"type": "json_object"}:
+            kwargs["text"] = {"format": {"type": "json_object"}}
+        else:
+            kwargs["text_format"] = output_cls
+
+        return kwargs
+
+    def _structured_stream_final(
+        self,
+        response,
+        output_cls: type[Model],
+        tool_map: dict[str, Tool],
+    ) -> ClientResponse:
+        if output_cls == {"type": "json_object"}:
+            # output_parsed is None in json mode: parse the raw text ourselves.
+            return ClientResponse(
+                content=[StructuredBlock(content=json.loads(response.output_text))],
+                stop_reason=getattr(response, "status", None),
+                usage=self._token_usage_from_metadata(getattr(response, "usage", None)),
+            )
+        return self._response_to_client_response(response, tool_map)
+
+    def _stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> Iterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        tool_map = {tool.name: tool for tool in tools}
+        kwargs = self._structured_stream_kwargs(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        final = None
+        with self.client.responses.stream(**kwargs) as stream:
+            for chunk in stream:
+                if isinstance(chunk, ResponseTextDeltaEvent):
+                    yield ClientResponse(content=[], delta=chunk.delta)
+
+                if isinstance(chunk, ResponseCompletedEvent):
+                    final = self._structured_stream_final(
+                        chunk.response, output_cls, tool_map
+                    )
+
+        if final is not None:
+            yield final
+
+    async def _a_stream_structured_response(
+        self,
+        input: str,
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs,
+    ) -> AsyncIterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        tool_map = {tool.name: tool for tool in tools}
+        kwargs = self._structured_stream_kwargs(
+            input,
+            output_cls,
+            memory,
+            temperature,
+            max_tokens,
+            system_prompt,
+            tools,
+            tool_choice,
+            **kwargs,
+        )
+
+        a_client = self._get_a_client()
+        final = None
+        async with a_client.responses.stream(**kwargs) as stream:
+            async for chunk in stream:
+                if isinstance(chunk, ResponseTextDeltaEvent):
+                    yield ClientResponse(content=[], delta=chunk.delta)
+
+                if isinstance(chunk, ResponseCompletedEvent):
+                    final = self._structured_stream_final(
+                        chunk.response, output_cls, tool_map
+                    )
+
+        if final is not None:
+            yield final
+
     def _embed(
         self, text: str | list[str], model_name: str | None, **kwargs
     ) -> list[float] | list[list[float]]:

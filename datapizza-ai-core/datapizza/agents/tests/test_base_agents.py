@@ -18,7 +18,7 @@ from datapizza.core.clients import ClientResponse
 from datapizza.core.clients.models import TokenUsage
 from datapizza.memory import Memory
 from datapizza.tools import tool
-from datapizza.type import ROLE, FunctionCallBlock, TextBlock
+from datapizza.type import ROLE, FunctionCallBlock, StructuredBlock, TextBlock
 
 
 class TestBaseAgents:
@@ -681,6 +681,225 @@ class GenKwargsEchoMockClient(MockClient):
 
     async def _a_invoke(self, input, tools=None, memory=None, **kwargs):
         return self._invoke(input=input, tools=tools, memory=memory, **kwargs)
+
+
+class NoStreamStructuredMockClient(MockClient):
+    """MockClient without streaming structured support (base defaults)."""
+
+    def _stream_structured_response(self, *args, **kwargs):
+        raise NotImplementedError("not supported")
+
+    async def _a_stream_structured_response(self, *args, **kwargs):
+        raise NotImplementedError("not supported")
+        yield
+
+
+class StreamStructuredUsageMockClient(MockClient):
+    def _stream_structured_response(
+        self,
+        input,
+        output_cls,
+        memory=None,
+        temperature=None,
+        max_tokens=None,
+        system_prompt=None,
+        tools=None,
+        tool_choice="auto",
+        **kwargs,
+    ):
+        yield ClientResponse(content=[], delta='{"name": "Alice",')
+        yield ClientResponse(content=[], delta=' "age": 30}')
+        yield ClientResponse(
+            content=[
+                StructuredBlock(
+                    content=output_cls.model_validate_json(
+                        '{"name": "Alice", "age": 30}'
+                    )
+                )
+            ],
+            delta=None,
+            stop_reason="stop",
+            usage=TokenUsage(completion_tokens=3),
+        )
+
+    async def _a_stream_structured_response(self, *args, **kwargs):
+        for chunk in self._stream_structured_response(*args, **kwargs):
+            yield chunk
+
+
+class TestAgentStreamStructuredOutput:
+    class Person(BaseModel):
+        name: str
+        age: int
+
+    def test_agent_stream_structured_output(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        json_input = '{"name": "Alice", "age": 30}'
+        res = list(agent.stream_invoke(json_input))
+
+        deltas = [r for r in res if isinstance(r, ClientResponse)]
+        assert deltas
+        assert all(r.delta for r in deltas)
+        assert "".join(r.delta for r in deltas) == json_input
+
+        final = res[-1]
+        assert isinstance(final, StepResult)
+        assert final.structured_data == [self.Person(name="Alice", age=30)]
+        assert final.text == ""
+
+    def test_agent_a_stream_structured_output(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        json_input = '{"name": "Alice", "age": 30}'
+
+        async def collect():
+            return [r async for r in agent.a_stream_invoke(json_input)]
+
+        res = asyncio.run(collect())
+
+        deltas = [r for r in res if isinstance(r, ClientResponse)]
+        assert deltas
+        assert "".join(r.delta for r in deltas) == json_input
+
+        final = res[-1]
+        assert isinstance(final, StepResult)
+        assert final.structured_data == [self.Person(name="Alice", age=30)]
+
+    def test_agent_stream_structured_fallback_single_shot(self):
+        agent = Agent(
+            name="test",
+            client=NoStreamStructuredMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        res = list(agent.stream_invoke('{"name": "Alice", "age": 30}'))
+
+        assert not any(isinstance(r, ClientResponse) for r in res)
+        assert isinstance(res[-1], StepResult)
+        assert res[-1].structured_data == [self.Person(name="Alice", age=30)]
+
+    def test_agent_a_stream_structured_fallback_single_shot(self):
+        class AsyncNoStreamStructuredMockClient(NoStreamStructuredMockClient):
+            async def _a_structured_response(self, *args, **kwargs):
+                return self._structured_response(*args, **kwargs)
+
+        agent = Agent(
+            name="test",
+            client=AsyncNoStreamStructuredMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        async def collect():
+            return [r async for r in agent.a_stream_invoke('{"name": "Alice", "age": 30}')]
+
+        res = asyncio.run(collect())
+
+        assert not any(isinstance(r, ClientResponse) for r in res)
+        assert isinstance(res[-1], StepResult)
+        assert res[-1].structured_data == [self.Person(name="Alice", age=30)]
+
+    def test_agent_stream_structured_unsupported_raises_value_error(self):
+        class FullyUnsupportedMockClient(NoStreamStructuredMockClient):
+            def _structured_response(self, *args, **kwargs):
+                raise NotImplementedError("not supported")
+
+        agent = Agent(
+            name="test",
+            client=FullyUnsupportedMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        with pytest.raises(ValueError, match="does not support structured responses"):
+            list(agent.stream_invoke('{"name": "Alice", "age": 30}'))
+
+    def test_agent_stream_structured_usage_aggregation(self):
+        agent = Agent(
+            name="test",
+            client=StreamStructuredUsageMockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        res = list(agent.stream_invoke("Tell me about Alice"))
+
+        final = res[-1]
+        assert isinstance(final, StepResult)
+        assert final.usage.completion_tokens == 3
+
+    def test_agent_stream_structured_partial_available(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        json_input = '{"name": "Alice", "age": 30}'
+        res = list(agent.stream_invoke(json_input))
+
+        deltas = [r for r in res if isinstance(r, ClientResponse)]
+        previous = ""
+        for chunk in deltas:
+            assert chunk.snapshot.startswith(previous)
+            previous = chunk.snapshot
+
+        assert deltas[-1].snapshot == json_input
+        assert deltas[-1].partial == {"name": "Alice", "age": 30}
+
+    def test_agent_a_stream_structured_partial_available(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            stream=True,
+            output_cls=self.Person,
+        )
+
+        json_input = '{"name": "Alice", "age": 30}'
+
+        async def collect():
+            return [r async for r in agent.a_stream_invoke(json_input)]
+
+        res = asyncio.run(collect())
+
+        deltas = [r for r in res if isinstance(r, ClientResponse)]
+        assert deltas[-1].snapshot == json_input
+        assert deltas[-1].partial == {"name": "Alice", "age": 30}
+
+    def test_agent_stream_output_cls_without_stream_flag(self):
+        agent = Agent(
+            name="test",
+            client=MockClient(),
+            system_prompt="You are a test agent",
+            output_cls=self.Person,
+        )
+
+        res = list(agent.stream_invoke('{"name": "Alice", "age": 30}'))
+
+        assert not any(isinstance(r, ClientResponse) for r in res)
+        assert isinstance(res[-1], StepResult)
+        assert res[-1].structured_data == [self.Person(name="Alice", age=30)]
 
 
 class TestAgentRunner:

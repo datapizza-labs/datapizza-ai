@@ -56,6 +56,23 @@ for product in store.products:
     print(f"- {product.name}: ${product.price}")
 ```
 
+## Streaming
+
+Structured responses can be streamed with `stream_structured_response` / `a_stream_structured_response`: intermediate chunks expose the raw JSON fragments via `chunk.delta` and a progressively parsed dict via `chunk.partial`, and the final chunk carries the validated instance in `chunk.structured_data`. See [Streaming](streaming.md#streaming-structured-responses) for full examples.
+
+```python
+for chunk in client.stream_structured_response(
+    input="Create a profile for a software engineer",
+    output_cls=Person,
+):
+    if chunk.partial and "name" in chunk.partial:
+        print(f"Name so far: {chunk.partial['name']}")
+
+person = chunk.structured_data[0]  # final chunk holds the validated model
+```
+
+Note that a field in `chunk.partial` may arrive in pieces: `age` can read `3` before settling on `36`. Treat partial values as display-only until the stream completes.
+
 ## Data Extraction
 
 ### Extract Information from Text
