@@ -804,6 +804,26 @@ class AgentRunner:
         tools = self._agent_tools(agent)
 
         if agent._output_cls:
+            if agent._stream:
+                yielded_any = False
+                try:
+                    for chunk in agent._client.stream_structured_response(
+                        input=task_input,
+                        output_cls=agent._output_cls,
+                        tools=tools,
+                        memory=memory,
+                        system_prompt=agent.system_prompt,
+                        **kwargs,
+                    ):
+                        yielded_any = True
+                        yield chunk
+                    return
+                except NotImplementedError:
+                    if yielded_any:
+                        raise
+                    # Client does not implement streaming structured output:
+                    # fall back to the single-shot structured response below.
+
             try:
                 yield agent._client.structured_response(
                     input=task_input,
@@ -891,6 +911,26 @@ class AgentRunner:
         tools = self._agent_tools(agent)
 
         if agent._output_cls:
+            if agent._stream:
+                yielded_any = False
+                try:
+                    async for chunk in agent._client.a_stream_structured_response(
+                        input=task_input,
+                        output_cls=agent._output_cls,
+                        tools=tools,
+                        memory=memory,
+                        system_prompt=agent.system_prompt,
+                        **kwargs,
+                    ):
+                        yielded_any = True
+                        yield chunk
+                    return
+                except NotImplementedError:
+                    if yielded_any:
+                        raise
+                    # Client does not implement async streaming structured output:
+                    # fall back to the single-shot structured response below.
+
             try:
                 yield await agent._client.a_structured_response(
                     input=task_input,

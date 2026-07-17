@@ -2,6 +2,7 @@ import warnings
 from typing import Any
 
 from pydantic import BaseModel, Field
+from pydantic_core import from_json
 
 from datapizza.type import (
     Block,
@@ -39,6 +40,8 @@ class ClientResponse:
         delta (str, optional): The delta of the response. Used for streaming responses.
         usage (TokenUsage, optional): Aggregated token usage.
         stop_reason (str, optional): Stop reason.
+        snapshot (str, optional): The raw text accumulated so far in a
+            streaming structured response. Set by the client streaming wrappers.
 
     """
 
@@ -49,6 +52,7 @@ class ClientResponse:
         delta: str | None = None,
         stop_reason: str | None = None,
         usage: TokenUsage | None = None,
+        snapshot: str | None = None,
         # Deprecated per-field args for backward compatibility:
         prompt_tokens_used: int | None = None,
         completion_tokens_used: int | None = None,
@@ -58,6 +62,7 @@ class ClientResponse:
         self.content = content
         self.delta = delta
         self.stop_reason = stop_reason
+        self.snapshot = snapshot
 
         if any(
             v is not None
@@ -135,6 +140,23 @@ class ClientResponse:
             item.content for item in self.content if isinstance(item, StructuredBlock)
         ]
 
+    @property
+    def partial(self) -> Any:
+        """Best-effort parse of the accumulated JSON `snapshot`.
+
+        Returns the partial value (usually a dict) parsed from the JSON text
+        streamed so far, or None when there is no snapshot or it cannot be
+        parsed yet. A field may be present but still incomplete until the
+        following key appears in the stream. The final chunk's
+        `structured_data` remains the only validated result.
+        """
+        if not self.snapshot:
+            return None
+        try:
+            return from_json(self.snapshot, allow_partial="trailing-strings")
+        except ValueError:
+            return None
+
     def is_pure_text(self) -> bool:
         """Returns True if response contains only TextBlocks"""
         return all(isinstance(block, TextBlock) for block in self.content)
@@ -147,6 +169,8 @@ class ClientResponse:
         return f"ClientResponse(content={self.content}, delta={self.delta}, stop_reason={self.stop_reason})"
 
     def to_dict(self) -> dict[str, Any]:
+        # `snapshot` is deliberately excluded: it only exists on streamed
+        # chunks, which never go through the cache/serialization path.
         return {
             "content": [block.to_dict() for block in self.content],
             "delta": self.delta,

@@ -17,6 +17,7 @@ from datapizza.type import (
 )
 
 from anthropic import Anthropic, AsyncAnthropic
+from anthropic.lib._parse._transform import transform_schema
 
 from .memory_adapter import AnthropicMemoryAdapter
 
@@ -632,3 +633,122 @@ class AnthropicClient(Client):
             stop_reason=response.stop_reason,
             usage=self._usage_from_anthropic_response(response),
         )
+
+    def _validate_structured_text(self, output_cls, text: str):
+        if hasattr(output_cls, "model_validate_json"):
+            return output_cls.model_validate_json(text)
+        return json.loads(text)
+
+    def _structured_output_config(self, output_cls: type[Model]) -> dict[str, Any]:
+        if output_cls == {"type": "json_object"}:
+            schema: dict[str, Any] = {"type": "object", "additionalProperties": True}
+        else:
+            schema = transform_schema(output_cls)
+        return {"format": {"type": "json_schema", "schema": schema}}
+
+    def _build_structured_stream_final(
+        self,
+        state: dict[str, Any],
+        output_cls: type[Model],
+        tool_map: dict[str, Tool],
+    ) -> ClientResponse:
+        content: list[StructuredBlock | FunctionCallBlock] = []
+        if state["message_text"]:
+            content.append(
+                StructuredBlock(
+                    content=self._validate_structured_text(
+                        output_cls, state["message_text"]
+                    )
+                )
+            )
+        content.extend(
+            self._build_streamed_tool_call_blocks(state["tool_calls"], tool_map)
+        )
+        return ClientResponse(
+            content=content,
+            delta="",
+            stop_reason=state["stop_reason"],
+            usage=TokenUsage(
+                prompt_tokens=state["input_tokens"],
+                completion_tokens=state["output_tokens"],
+                cached_tokens=0,
+            ),
+        )
+
+    def _stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs: Any,
+    ) -> Iterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        client = self._get_client()
+        tool_map = {tool.name: tool for tool in tools}
+        messages = self._structured_messages(input, memory)
+        params = self._structured_request_params(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs,
+        )
+        params["output_config"] = self._structured_output_config(output_cls)
+        params["stream"] = True
+
+        stream = client.messages.create(**params)
+        state = self._new_stream_state()
+
+        for chunk in stream:
+            text_delta = self._consume_stream_event(state, chunk)
+            if text_delta:
+                yield ClientResponse(content=[], delta=text_delta)
+
+        yield self._build_structured_stream_final(state, output_cls, tool_map)
+
+    async def _a_stream_structured_response(
+        self,
+        input: list[Block],
+        output_cls: type[Model],
+        memory: Memory | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
+        tools: list[Tool] | None = None,
+        tool_choice: Literal["auto", "required", "none"] | list[str] = "auto",
+        **kwargs: Any,
+    ) -> AsyncIterator[ClientResponse]:
+        if tools is None:
+            tools = []
+        client = self._get_a_client()
+        tool_map = {tool.name: tool for tool in tools}
+        messages = self._structured_messages(input, memory)
+        params = self._structured_request_params(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_choice=tool_choice,
+            **kwargs,
+        )
+        params["output_config"] = self._structured_output_config(output_cls)
+        params["stream"] = True
+
+        stream = await client.messages.create(**params)
+        state = self._new_stream_state()
+
+        async for chunk in stream:
+            text_delta = self._consume_stream_event(state, chunk)
+            if text_delta:
+                yield ClientResponse(content=[], delta=text_delta)
+
+        yield self._build_structured_stream_final(state, output_cls, tool_map)
