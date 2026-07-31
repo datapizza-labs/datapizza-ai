@@ -1,4 +1,4 @@
-from jinja2 import Template
+from jinja2.sandbox import SandboxedEnvironment
 
 from datapizza.core.modules.prompt import Prompt
 from datapizza.core.utils import extract_media
@@ -24,9 +24,10 @@ class ImageRAGPrompt(Prompt):
             image_prompt_presentation: str # The image prompt jinja template
             each_image_template: str # The each image jinja template
         """
-        self.user_prompt_template = Template(user_prompt_template)
+        env = SandboxedEnvironment()
+        self.user_prompt_template = env.from_string(user_prompt_template)
         self.image_prompt_presentation = image_prompt_presentation
-        self.each_image_template = Template(each_image_template)
+        self.each_image_template = env.from_string(each_image_template)
 
     def _extract_images_from_chunk(self, chunk: Chunk) -> list[MediaBlock]:
         metadata = chunk.metadata
