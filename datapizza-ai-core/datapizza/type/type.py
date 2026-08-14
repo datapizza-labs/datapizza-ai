@@ -29,7 +29,10 @@ class ROLE(Enum):
         elif self == ROLE.ASSISTANT or self == ROLE.SYSTEM:
             return "model"
         elif self == ROLE.TOOL:
-            return "tool"
+            # Gemini 3.x rejects the "tool" role with 400 INVALID_ARGUMENT
+            # ("Role 'tool' is not supported"); function responses must be
+            # sent as "user" turns, which older models accept as well.
+            return "user"
         else:
             raise ValueError(f"Unknown role: {self}")
 
