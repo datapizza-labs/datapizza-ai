@@ -359,6 +359,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=datapizza-labs/datapizza-ai&type=Date)](https://www.star-history.com/#datapizza-labs/datapizza-ai&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=datapizza-labs/datapizza-ai&type=Date)](https://star-history.dera.page/#datapizza-labs/datapizza-ai&Date)
 
 </div>
