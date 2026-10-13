@@ -32,13 +32,17 @@ class InMemoryTraceExporter(SpanExporter):
                 del self._finished_spans[trace_id]
 
     def get_finished_spans(self) -> dict[int, list[ReadableSpan]]:
-        """Get list of collected spans."""
+        """Get a snapshot of collected spans, grouped by trace ID."""
         with self._lock:
-            return dict(self._finished_spans)
+            return {
+                trace_id: list(spans)
+                for trace_id, spans in self._finished_spans.items()
+            }
 
     def get_finished_spans_by_trace_id(self, trace_id: int) -> list[ReadableSpan]:
+        """Get a snapshot of collected spans for a trace."""
         with self._lock:
-            return self._finished_spans.get(trace_id, [])
+            return list(self._finished_spans.get(trace_id, []))
 
     def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
         """Stores a list of spans in memory."""

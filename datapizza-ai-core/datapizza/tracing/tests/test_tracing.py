@@ -97,6 +97,35 @@ class TestInMemoryTraceExporter:
         assert result == SpanExportResult.FAILURE
         assert len(exporter.get_finished_spans()) == 0
 
+    @pytest.mark.parametrize("all_traces", [False, True])
+    def test_returned_spans_cannot_clear_exported_trace(
+        self, exporter, mock_span, all_traces
+    ):
+        exporter.export([mock_span])
+        if all_traces:
+            spans = exporter.get_finished_spans()[12345]
+        else:
+            spans = exporter.get_finished_spans_by_trace_id(12345)
+
+        spans.clear()
+
+        assert exporter.get_finished_spans_by_trace_id(12345) == [mock_span]
+
+    @pytest.mark.parametrize("all_traces", [False, True])
+    def test_returned_spans_do_not_change_after_later_exports(
+        self, exporter, mock_span, all_traces
+    ):
+        exporter.export([mock_span])
+        if all_traces:
+            spans = exporter.get_finished_spans()[12345]
+        else:
+            spans = exporter.get_finished_spans_by_trace_id(12345)
+
+        exporter.export([mock_span])
+
+        assert spans == [mock_span]
+        assert exporter.get_finished_spans_by_trace_id(12345) == [mock_span, mock_span]
+
     def test_clear_all_spans(self, exporter, mock_span):
         """Test clearing all spans."""
         exporter.export([mock_span])
